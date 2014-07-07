@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+    <head>
+		<!--This page is a Display for a POP system.  Eventually, a user
+			will simply open this page in their browser, and it will
+			load whatever the last view was for that user.  The user will
+			then enter gestures and get responses in the form of new things
+			drawn on the display.  For example, they can open worksheets
+			or view srcHolder contents, in either syntactic form or syntax
+			graph form.  And they can manipulate the environment, such as
+			make tunnels to other systems, create persistent processors, 
+			expand the running processors made from a particular code
+			base (IE, the POP equivalent of running a program) and so on.
+			
+			For now, this page starts up the entire POP system, but in the
+			future it will simply connect to an existing, persistent one.-->
+        <title>POP Display</title>
+
+        <!-- load the POP system via the requirejs module system -->
+        <script data-main="startUpApp" src="lib/require.js"></script>
+		
+        <!-- helper -->
+		<script src="lib/jquery.min.js"></script>
+		
+        <!-- Declare mobile device compatibilites -->
+		<meta name="viewport" content="width=device-width, maximum-scale=1, user-scalable=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+        <!-- backwards compatibility for famous stuff -->
+        <script type="text/javascript" src="lib/functionPrototypeBind.js"></script>
+        <script type="text/javascript" src="lib/classList.js"></script>
+        <script type="text/javascript" src="lib/requestAnimationFrame.js"></script>
+
+        <!-- load the famous stuff -->
+        <link rel="stylesheet" type="text/css" href="lib/famous.css" />
+        <script type="text/javascript" src="lib/famous.js"></script>
+		
+<!-- the famous stylesheet messes up text fonts, but the famous surfaces don't paint their background properly without the famous CSS.. -->
+        <link rel="stylesheet" type="text/css" href="lib/famous_styles.css" />
+
+    </head>
+
+<body>
+
+</body>
+</html>

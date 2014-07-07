@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>famo.us App</title>
+        <meta name="viewport" content="width=device-width, maximum-scale=1, user-scalable=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+        <!-- shims for backwards compatibility -->
+        <script type="text/javascript" src="http://code.famo.us/lib/functionPrototypeBind.js"></script>
+        <script type="text/javascript" src="http://code.famo.us/lib/classList.js"></script>
+        <script type="text/javascript" src="http://code.famo.us/lib/requestAnimationFrame.js"></script>
+
+        <!-- module loader -->
+        <script type="text/javascript" src="http://code.famo.us/lib/require.js"></script>
+
+        <!-- famous -->
+        <link rel="stylesheet" type="text/css" href="http://code.famo.us/famous/0.2/famous.css" />
+        <script type="text/javascript" src="http://code.famo.us/famous/0.2/famous.js"></script>
+		
+<!-- the famous stylesheet messes up text fonts, but the famous surfaces don't paint their background properly without the famous CSS.. -->
+        <link rel="stylesheet" type="text/css" href="http://code.famo.us/assets/famous_styles.css" />
+		
+        <!-- load D3, to play around with also! -->
+		<!--script type="text/javascript" src="d3/d3.v3.js"></script-->
+		
+    </head>
+
+<!--
+<script src="terminal.js">
+</script>
+<body onload="window.start('terminal');">
+
+<div id="loader">...</div>
+-->
+<body>
+<canvas id="myCanvas" width="200" height="200" style="border:1px solid #000000;">
+Your browser does not support the HTML5 canvas tag.
+</canvas>
+
+<canvas id="POPCanvas" width="200" height="100" style="border:1px solid #000000;">
+</canvas>
+
+<!--script type="text/javascript">require(['famous_surface_example']);</script-->
+
+<script src="epocritesPuzzle.js">
+</script>
+
+</body>
+</html>
+
+

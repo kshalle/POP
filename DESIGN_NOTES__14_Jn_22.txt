@@ -1,0 +1,117 @@
+
+Working on getting visual of a POP syntax graph
+
+-] Have Famo.us, which has hierarchical drawning structure that fits well to what had in mind for POP
+
+-] Famo.us has animations and physics engine, so as user modifies things, they can fly around in pleasing ways.
+
+-] Famo.us structure is almost one-to-one with the visualizer's internal structure that I was imagining..  seems wasteful to duplicate..
+
+-] However..  need the visualization to be independent of any particular drawing facility..  for example, the visualization should be reusable with a Java based canvas that is painted via Swing, as well as via Famo.us and via C++ drawing code..
+
+-] The visualization must be specific to the data format..  therefore, it should be part of the holder that the data is inside of.  Don't want case where new syntax is added, and have to go around to all the different places, like Java app, and javascript displayer, and so on, and change code in all those! (even if they all take a plugin, that plugin will have to be in terms of the language -- java, javascript, C++, whatever -- and the plugin will have to spit out some standard thing anyway!)  
+Rather, want the visualizer to be written once, in POP, and plugged into the data-holder.  It spits out standardized visual elements..  any technology can then take those visual elements and paint them to a screen.
+The visualizer has fingers directly on the raw data, in whatever the internal format is for the holder..  A holder can have a different internal format vs external format..
+
+(update: fighting with text -- haven't found any general way of calculating the width of text, given the font..  entry after entry from google search has variations on applying the text to a canvas, causing it to render, then getting the bounding box that was generated during render..  there doesn't seem to be, even for SVG, any way to predict the bounding box!!!?!?!?!  So.. there is a cascade effect..  the text must be contained within something, like a rectangle or elipse or whatever..  and, as worked out during the rest of this design session, the visualizer is responsible for calculating the placement of all the SVG shapes..  then the visualizer MUST know the size of the text, in order to know the size of the shape, in order to calculate a reasonable placement of shapes..  
+   it is tempting to leave all the shape placements specified as relative, and let the final values be figured out inside the Display..  this would also allow things like employing the Famous physics engine to calculate placements, even let the placements evolve by themselves (like the D3 examples with the graph nodes flying around to find their own placement).. that would happen without the visualizer setting the placements..  rather, the visualizer would establish the visual "connectivity".. noooo..  that D3 thing relied upon knowing that it was a graph and that arcs acted like springs and nodes acted like weights, and nodes exerted n-body attraction..  but that is all specific to graphs..  would it generalize to arbitrary syntax?  Hmmmm..  if had an "atomic" level, where inside an atomic unit nothing moves relative,  then, yes, can treat the connections between these atomic things as springs, and each atomic thing has attractive mass and inertia..  can let them run around and find a stable configuration..
+   Okay, so two issues: what about connections that go off-screen to out-side-the-view portions of syntax graph, and what about the user wanting to pin particular things in particular places..  often what a feeling of solidity, reliable placement so you know where everything is..
+   Right, so this: for now, visualizer calculates fixed positions, but have in back of mind keeping ability for multiple kinds of visualizer within the same srcHolder..  and visualizer has ability to expect things of the Display, such as providing physics, and visualizer can maybe ask Display what kinds of visualization list it understands..  so then can add, say, dynamic view hierarchy, where visualizer specifies things like masses and springs and lets Display move them around as it sees fit..  can evolve standard view lists over time..  the Commander will have to include some facility for not allowing a user to select a visualizer that is unable to generate any of the list types acceptable to the Display the user is interacting with.)
+
+-] A holder may also have other data-format-and-semantics specific things, such as a querier -- the querier defines the format of queries it accepts, and those queries are tailored to the nature of the data in the holder.  Hence, say, a video holder might have a querier plugged in that accepts canonical shapes, and then searches the raw video data for frames that contain that shape.  The querier would spit out things in a format that it defines.  For example, it may have a data structure for a video frame, and spit out a stream of frames that contain the requested shape.
+
+-] Data formats should be visually defined.. for example, I should be able to draw a picture of a graph node, and that picture is the code that defines the data structure, which can then be used in other places in the code.  For example, in the Hamiltonian Path code, could have included a picture of a graph node, and connected a line to the portion being accessed, say, in a test, or in the "for all" construct..
+
+-] Seeing a hierarchy of holders..  so a higher level holder could have multiple lower level holders inside of it..  getting a bit awkward, say with combining queriers and visualizers -- how do you combine visualizations from siblings?  there's something fundamental here.. 
+
+-] No data may be warehoused outside a holder..  the holder collects the things needed to interact with the data, such as modifier, visualizer, querier, and not sure yet what all else..
+
+-] Data outside a holder must be in the form of a data structure instance, where the structure was defined by the holder the data came from.  The holder took whatever internal format the data resided in and placed it into the data structure form.  All data within a POP system that is not inside a holder must be in the format of a structure defined using POP primitives.  NO RAW BYTES!  Bit twidling only upon bit-vector structures.  An adaptor is necessary in order to get a more primitive format of data (IE, can always do conditional tests on bits held in a bit-vector format, and build up values within a higher level format structure based on the test results.. example, do the math to accumulate individual bit values from a bit-vector, but accumulate them into an integer format.  Or, can test bits that represent graph edges, and build up a graph data structure.  aso..)
+
+-] A visualizer can include animations as visual elements that it spits out.
+
+-] Famous will generate events that are gestures such as mouse clicks.  The event handler will use the event data to connect the event to one of the original visual elements that was visualized.  It will construct a structure that states the visual element and the gesture details, and send that to the commander.
+
+-] the commander will convert the visual element plus gesture into some action, such as moving the insertion point, or zooming the view, or adding a syntax node..  the command sends the command to the appropriate place -- could be the drawing engine (for zoom or pan actions).. or could be the modifier for insertion point or syntax element actions..  or could be some entity that carries out the action. For example when viewing a worksheet, a gesture could trigger re-calculation, so the action would be a "perform calculation" sent to one or more processors that are connected to the worksheet.
+
+-] The modifier has access to the holder's internal data format, and can manipulate it directly.  It receives commands, such as generated by gestures performed on the display.  
+
+-] A worksheet lives inside a holder as well..  the worksheet can talk to processors..  for example, the visualizer may simply include a reference to a processor that spits out data, and sends the reference in the visual element.  An image may be a good example..  the image is on the worksheet for some reason..  the visualizer embeds reference to image in an element and sends that to the display.  The display then directly gets the image data and paints it.
+
+-] Right, so one way to combine visualizers in a hierarchy, is for higher level visualizers to specify a lower-level one that is to fill in the internals of a given bounding box.  So the lower-level is sent the bounding box, and it generates a view hierarchy that fits inside of that.  Not sure whether the Display should be the one that sends the requests and integrates the various responses, or the Visualizer should send the requests and integrate the responses.
+
+==============================================
+=
+=
+==============================================
+So, question..  what do display list elements look like?  Does visualizer produce the layout, for example, specify a bounding box and position for each element, including text, lines, etc?  Does it produce the bezier curves in SVG that connect syntax graph elements?
+
+Or, does it send something with fewer details?  Let the Display calculate exact placement of visual elements?
+
+What about pan and zoom?  Does Visualizer handle that, or Display..  pan means moving some elements out of the painted canvas and moving others in..  zoom does too, in addition to calculating new transforms for each element painted..  So, if Display does this, then it must either have all the visual elements in it, or else it much send a request to Visualizer that triggers sending what's needed..
+
+Soooo..  make a two-way path between Display and Visualizer, in order to handle pan, zoom, 3D rotates, and so forth?
+
+Orrrr..  leave that to the MVDM loop..  the pan/zoom/rotate gestures go into the command-maker, and thence into the visualizer, which then sends view update..
+
+sooo..  this view update stuff..  does Display keep a full representation of the visual elements, and then translate that into Famo.us elements?  Or, does it keep, say, a current visualizer list..  where visualizer updates simply modify the previous list sent..  then Display translates the updated list into Famo.us elements..  given that Famo.us doesn't support removing render tree elements, that might be a good approach..  and it simplifies the thing about how to figure out what a visualizer update is and what to do with it inside the Display.
+
+Okay.. now..  just need to figure out what the Visualizer actually sends..  how much detail..
+
+You know what?  I don't want to think about it!  Just going to do something, see what happens, and then can modify later..  probably will never get modified, these choices have a way of sticking, due to momentum of volume of work and low improvement in changing..  but, don't want to stall myself, need to keep moving..
+
+sooooo...  something has to calculate placement of bounding boxes, and calculate translations and sizing..  and move things in and out based on zoom, pan, rotate..  and trigger redraws and resends of display data for graphs and calculation results..  seems like if put placement and transform calcs inside Display then are making the Display an active thing, giving it intelligence and control..  then, run into problems when have a view that is composed of pieces from many different holders and different processors..  for example, displaying a worksheet, where the worksheet itself is in a holder that generates a view, and locations on the worksheet are calculated by live processors, and locations are graphs which are generated by graphing processors that take calculations from other processors..  want the worksheet holder to handle generating the view, and collecting the data from the other processors..  don't want the Display to have any kind of intelligence related to this!  
+
+Hmmm..  so, if the worksheet holder is doing all of the collecting of data and triggering re-calcs, and melding together into a view..  then Display is simply passively painting that and collecting gestures that it sends back..  the holder then knows what to do with the gestures performed upon view elements..  
+
+So that means that the Display should not be calculating pan and zoom and rotate!!  Those are responses to gestures, and those trigger behaviors from the visualizer (which may, in turn, have to trigger behaviors from other processors in order to get updated calcs to put into the view)
+
+Got it, so as tempting as it is to peel off such gestures in the Display and build intelligence into there..  it will cause problems..  so best to have all the visual related processing be done inside the visualizers..  
+
+so..  means the visualizer should send out things pretty close to renderable..
+
+Now.  The question comes up..  what format?  Does the visualizer send out SVG?  Is that universal enough?  Will that cause problems with non-browser based approaches?  If not SVG, then what?  Will need to represent paths..  does visualizer calculate Bezier curves and send those?  Or does it just say "here are end points, connect these with a smooth path"?  Does the visualizer calculate how to route arcs within a graph around the other nodes in an optimal way?  If the user supplies helpers by moving things, does the Display remember that, or the Visualizer?  
+
+Ahhhh..  okay..  if what the user to be able to affect the visual arrangement, then need to remember the gestures they give that are related to visual arrangement..  for example, they grab bezier control points and move them, in order to affect a curve, or add new points within a path in order to route it..  those things have to be remembered!  The Display has no place to store such things!!
+
+Right..  that means that the holder must store info related to viewing the holder contents!  sooooo..  the visualizer must be the thing that generates any details that a person may want to adjust.
+
+Right.  Any visual arrangement that a person might want to adjust must be stored inside the holder, and so the visualizer must be the thing that generates that level of detail.  Right.  Got it.
+
+So.  Yes.  That means that the visualizer must send out bounding boxes, translations, sizing, path points, control points, and so forth.  So.  Yes.  SVG is looking like a good way to go..  has to be something!  Can invent my own equivalent, which specifies paths, shapes, widths, and so forth..  but what is the gain?  The only potential is sending in binary, to save the overhead of SVG's text embodiment.  The savings worth the effort?  NO!
+
+Okay then.  SVG.  That is the visualizer's format for POP.  Or perhaps it just sends the values that go into the SVG?  The Display does the final conversion to text-based SVG format?  Hmmmm, what about custom syntax, which is SVG from the programmer?  Just send indication of SVG elements, together with the values?  Maybe enums for the SVG indicators, or something..
+
+Now.  Question is, how much effort?  Is it more effort to send a representation, then construct text-repr inside Display?  Or more effort to construct SVG text in visualizer and send it ready-made?
+
+Seems easier to just construct SVG text inside visualizer and send that.. 
+
+Heck, if send representation, then are already forcing SVG!  It doesn't constrain the Display if send the text form..  the display is just as free to convert the binary form to something else as it is to convert the text form to something else..  so if Display is not browser, and doesn't have SVG drawing primitives, it has to do the extra step of parsing SVG in order to extract the values from the text, and then generate whatever internal form it has, such as calculating paths or even pixels itself..  the extraction from text does not seem like a terribly large burden compared to the rest.
+
+Buuuut..  don't really care!  Going to generate text form inside visualizer, because, why not?  Then the Display only translates displayList elements into its internal thing that paints.  In the case of browser, Display translates display list into famo.us elements, placing the SVG verbatim onto famous surfaces, and makes the SVG bounding box the same as the famous surface size.
+
+In fact, display list is going to represent almost verbatim what a Famo.us render tree will look like!  It is a fairly universal declaration..  hierarchy of local visual contexts, with relationship among those contexts, including relative placement in 3D space and relative sizing from one to another.
+
+Alright, getting to it now..  display list will be a serialization of a hierarchy..  The top of the hierarchy is the view painted onto.  The Display tells the visualizer what the pixel dimensions are of the view.  The visualizer makes that the top level bounding box.  It then inserts bounding boxes within that, and inserts bounding boxes within those, and so forth down.  Each bounding box is either a hierarchy element, relationship element, or a painted element.  Hierarchy elements simply state what elements are included, and give their own bounding box.  Relationship elements are attached by the parent hierarchy element.  For example, it is the job of the parent to make sure all the children fit inside its bounding box.  The bounding box may be 2D or 3D.  A parent ensures the fit by attaching relationships to the children elements.  The relationships can be translations or scalings or rotations.. or actually any arbitrary 3D transform.  A hierarchy element knows nothing of the context in which it fits, so it has no way of attaching relationships to itself!  Each hierarchy element is responsible for ensuring that all descendants fit within its bounding box.  Any relationship attached to a hierarchy element is transitively applied to all descendants of the hierarchy element.  For example, if one is rotated in 3D, then it, together with all its contents, is rotated as a unit.  Each descendant maintains the same relationship to its parent as before..  but the entire bundle has been rotated as a unit!
+
+Great..  so that is the display list..  it is a serialization of that hierarchy.  A display update then assumes a given hierarchy, and says "change this relationship between this parent and this child" or "remove this parent and all descendants" etc..  in effect, it specifies a change to the hierarchical structure..
+
+Sooooo..  means that have two copies of the view hierarchy..  one inside the visualizer, which is serialized, and another inside the Display, which is translated into Display-local elements that are then painted.
+
+Not the most efficient..  hurts me..  but, well, what are you going to do?  What's better?  Need the flexibility of having the visualizer control all changes to the view hierarchy.. and need the visualizer to calculate all placement and path details so that user changes can be remembered inside the holder (without something clunky like "save this view modification info as a black box and hand it to the Display, which knows what it means" yuck, just begging for loss of sync when move from one Display to another or even upgrade the Display!)..  
+
+so, then, there's no way around having the visualizer internally represent the bounding box hierarchy as it constructs the details.  Thennnnn..  something must translate that representation into the internal Display representation!  The Display could have any native form internally..  canvas with paths drawn upon it, Java 2D, even just pixels, with all the code in between..  well, in effect, every Display ends up being everything between that hierarchy and on down to pixels!!
+
+So, could just hand the data structure from visualizer to the Display..?  This is fine if both are inside same hardware, sharing memory..  but need a serialization if Display has separate memory..  which it will if the src holder is on a server and the display is a browser on a client!
+
+Hmmm..  what about just handing the data structure to the Display for now..  can always add the serialization later, it's not functional!  :-)  Ahhh, yes.. less work.  Good.  Okay, will do that.  save serialization for later.  For now, in javascript, will build a src holder that saves syntax graph natively in JSON, as an internal data structure of the form made for GabePatterns.  The visualizer in the src holder will generate a view hierarchy from that data structure.  It will save any view related data within the syntax graph data structure as extra properties added to the nodes.  The visualizer will then hand a reference to the view hierarchy directly to the display object.  The display object will then generate famous elements from the view hierarcy elements.  View updates will simply be the visualizer changing the view hierarchy then calling the display with a reference to the changed hierarchy.
+
+Done.  Make it so.
+
+BTW, thinking to introduce another component, which is a helper, that maybe takes some higher level view form and generates the view hierarchy from that..  this will ease the burden on developers who make custom syntax.. it will act as a library for them, essentially..  (and, of course, there will be a serializer that turns a view hierarchy into a stream of visual objects sent to the Display, which will reconstruct the view hierarchy then translate that into into elements that it paints.. for now, that serializer is just JSON!  It has provision to translate javascript objects into text form, and then on the other side parse that text form to reproduce the javascript objects.. might need extra logic in order to recreate the links among parents and children.. not sure whether JSON can go deep that way..).
+
+
+ 
+
+
+
