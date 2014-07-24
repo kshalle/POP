@@ -32,7 +32,7 @@
 
 #-] Get famous working without a net connection -- download whatever URLs that the page references, so are local files.
 
--] Get famous fonts -- download to local somehow..
+XXX -] Get famous fonts -- download to local somehow..
 
 #-] Figure out how that other graph drawing thing made the curvy arrow-lines between nodes..
 
@@ -44,28 +44,30 @@ XXX -] Next, draw two element nodes, complete with properties and ports, with li
 [-] Were also doing a hierarchy of bounding boxes
 [-] Were parsing the syntax graph -- generate a bounding box and visual contents for each kind of element in the syntax graph
 
--] Next, define a data structure for the visual elements.
-- -] within it is the information needed to construct the graph that have drawn
-- -] see below for visual element design.. and #look back over java version..
+#-] Next, define a data structure for the visual elements.
+#- -] within it is the information needed to construct the graph that have drawn
+#- -] see below for visual element design.. and #look back over java version..
 
--] Next, take the syntax graph for the GabePatterns, create the visual elements to represent that.
+#-] Next, take the syntax graph for the GabePatterns, create the visual elements to represent that.
 
--] Next, write the Display object to receive the visual elements, and then create the famous objects from it, which end up painting the syntax graph elements as seen in the PDF.
+#-] Next, write the Display object to receive the visual elements, and then create the famous objects from it, which end up painting the syntax graph elements as seen in the PDF.
 
--] Next, create the visual element objects for the rest of the syntax graph, and have them all draw to the screen, using famous.
+#-] Next, create the visual element objects for the rest of the syntax graph, and have them all draw to the screen, using famous.
 
--] Make a Display object, which contains the code wrote above.
+#-] Make a Display object, which contains the code wrote above.
 
--] Have the Display object receive the visual element object, and proceed to draw it to the screen using famous.  Choose a protocol for handing visual element objects to the Display and triggering the Display to render them via famous.
+#-] Have the Display object receive the visual element object, and proceed to draw it to the screen using famous.  Choose a protocol for handing visual element objects to the Display and triggering the Display to render them via famous.
 
--] Make the visual elements for a graph of 5 nodes.  hand them to the display.
+#-] Make the visual elements for a graph of 5 nodes.  hand them to the display.
 
--] Make a "change" visual element.  Have the display modify its famous structure according to the change visual element.
+XXX -] Make a "change" visual element.  Have the display modify its famous structure according to the change visual element.
+[-] Famous can't do this!  Just send a new visual hierarchy and render the whole thing
 
+//================  Visualizer =================
 
--] Separately, the task is to construct a visual hierarchy structure inside the visualizer..  then to convert that into visual elements..  then to receive those elements in the famous display, and reconstruct a famous structure from the stream of visual elements.
+-] Separately, the task is to construct a visual hierarchy structure inside the visualizer..  then to convert that into visual elements..  #( this part  done) receive those elements in the famous display, and reconstruct a famous structure from the stream of visual elements.
 
--] Create a source holder object.. just a simple thing, as a place holder
+#-] Create a source holder object.. just a simple thing, as a place holder
 
 -] dump the syntax graph wrote for Gabe out to a JSON file
 
@@ -73,11 +75,11 @@ XXX -] Next, draw two element nodes, complete with properties and ports, with li
 
 -] Then, make a new object, just one syntax graph element, as above.  Send it to a JSON file.  Have the source holder read it in and convert to javascript object.
 
--] make a visualizer object inside the source holder
+#-] make a visualizer object inside the source holder
 
--] give the visualizer access to the data structure inside the holder, which is the syntax graph
+#-] give the visualizer access to the data structure inside the holder, which is the syntax graph
 
--] have the visualizer build its own data structure?  Or augment the existing one with new stuff?  Add a visualizer field to all of the syntax graph nodes?  Make it an array, one spot for each visualizer added to the source holder?
+-] have the visualizer build its own data structure?  Or augment the existing one with new visual related stuff?  Add a visualizer field to all of the syntax graph nodes?  Make it an array, one spot for each visualizer added to the source holder?
 
 -] Go with augment for now, even though feels like it's mixing things dangerously..  it, on the other hand, puts the visualization right into the data visualized, so keeps the two in sync -- no danger of something modifying the data behind the back of the visualizer..
 
@@ -85,88 +87,98 @@ XXX -] Next, draw two element nodes, complete with properties and ports, with li
 
 -] have the visualizer generate a visual element object from that simple graph.
 
--] have the visualizer send that visual element to the display created above, which 
-
--] Draw the visual hierarchy structure, which is separate from the syntax graph data.  Perhaps make them both the same data structures, just add visual objects as properties (which are ignored by everything thing else, like the compiler)
+-] have the visualizer send that visual element to the display created above
 
 -] The javascript structure of linked objects will be internal to the source holder.  The visualizer will take that and construct stream of visual elements from it.  The modifier will directly modify it.  The holder will also have a serialized version of the data structure -- which is JSON format.  The data structure will be made such that can use the JSON tools to directly turn it into JSON, save that to a file, then later read the file back, and use the JSON tool to parse the JSON back into the javascript linked objects.
 
 -] The modifier will attach additional objects and properties, which are used to manage interaction with something that is editing the source..  for example, an insertion point is maintained, and highlight markings, and selection markings.  (maybe multiple selections, and even browse through previous selections, and fork off one)
 
--] The modifier will notify the visualizer of what changed, each time it does a change.  The visualizer can then decide what needs to be re-sent to the display, and can decide new visual placements of things, if needed..
+-] The modifier will notify the visualizer, somehow, of what changed, each time it does a change.  The visualizer can then decide what needs to be sent to the display, and can decide new visual placements of things, if needed.. (thinking maybe have delimiters in the graph, that mark the boundaries of what is being visualized, and act as anchor points for pulling in things from off-screen..)
 
+//=================  From graph to placement and size  ==================
+//
+//=======================================================================
+Given a syntax graph, need an algorithm for deciding what are the local contexts, building up the hierarchy, and positioning each element inside a given context, and scaling that context relative to its parent (all siblings should have the same scale).
 
-==============================================
+Okay..  first, have connections between different graph elements..  want connected things to be visually close..  second, want to include user-specified hierarchy, so entire sub-graphs can be tagged as one "unit" -- the equivalent of a function -- such units can be re-used in multiple places..
+
+Will need different view annotations for each place the function is used..  so, maybe add typed properties to the original, where each type says which reference it pertains to..  so each reference can have different view arrangements..  Or, maybe, 
+
+//==
+
+Okay, what about this..  place annotations, by hand, onto the syntax graph objects..  those state placement relative to each other, and state visual hierarchy, and state scale relative to each other..  then, the current view is like a projection onto the graph, that selects which elements are within the view, and sets a global zoom.
+
+You know, pretty much want to build the view hierarchy as part of the syntax graph..  will need visual hierarchy, including bounding boxes, in order to calculate what is (potentially) visible to the camera, and when go to 3D, will need hierarchy in order to know things like what to represent as a single box, versus to break open and show the innards..  and hierarchy will decide relative scale to each other -- siblings at same scale as each other, and parents at larger scale than children, and once scaled small enough, stop showing children, which are the innards, instead just show the parent as a box.  Also will want hierarchy during projection from 3D onto the camera's view..  hierarchy will affect placement within 3rd dimension..
+
+Will, at some point, want topological visualization, which represents translations between worlds..  represents the twist-upon-itself topology of many types of thought..  the thing where, when think about some system, there are relationships among things such that part of thought moves within one "system" or one "universe" and then a transition happens to a different system/universe after which have relationships within that one, then switch again..
+
+=========================================================
+==
+==
+==
+==========================================================
+
+-] attach the view hierarchy to the syntax graph itself
+- -] The Display receives pointer to the hierarchy, but it is embedded within the syntax graph, as an extra field that exists in every node, but the field is not visualized.
+
+-] make the Visualizer attach a handler fn to each bounding box
+- -] test that the smallest bounding box is what receives the event 
+- -] place parent links into each bounding box in the view hierarchy
+
+-] make the Display register a Famous event on each surface that corresponds to a bounding box
+- -] make the Display put a back-link in each surface that points to the view hierarchy bounding box that the surface corresponds to
+- -] when register the event, register the generic Display event-handler
+
+-] make a generic-event-handler, which is part of the Display code
+- -] it receives the event object
+- -] it takes the surface out of the event object
+- -] it uses the back-link in the surface to get the view hierarchy object
+- -] it calls the handler function attached to the view hierarchy object
+
+-] make a handler for key presses.
+- -] the handler receive the event object, plus the smallest enclosing bounding box.
+
+-] make the gesture-handler turn the event plus bounding box into a command.
+
+For example, if previously a gesture caused the start of the mode for typing text into a field -- say for entering the name of a variable -- then the gesture handler looks that up, within state enclosed with the gesture handler but shareable among different handlers.  The code then branches to where it extracts the key value from the event object.  It reuses a "key into field" command object, and packs it with data.  The data includes the model-object that is attached to the appropriate bounding box (the handler does the work of figuring out which bounding box corresponds to the syntax graph object that owns the field that is being typed into).  So, each bounding box has a back-link to the Model object that the shape inside the bounding box represents, where appropriate (IE, the bounding box for text has no back-link, but the bounding box for the element-box shape does have a back-link to the element object!)  Might make it just "useful info" -- for example, a text bounding box might include the name of the field of the object that the larger enclosing bounding box back-links to.  The gesture-handler will also extract any needed info from the event object, such as which key was pressed, and add that to the command-object.
+
+The command is then sent to the Modifier, which changes the back-linked-to syntax graph objects.  As part of that, it also modifies the visualized-sub-graph, and notifies the visualizer to update.
+
+==============================================================
 =
+=   Use cases
 =
-==============================================
-So, question..  what do display list elements look like?  Does visualizer produce the layout, for example, specify a bounding box and position for each element, including text, lines, etc?  Does it produce the bezier curves in SVG that connect syntax graph elements?
+==============================================================
 
-Or, does it send something with fewer details?  Let the Display calculate exact placement of visual elements?
+-] hit space bar, which brings up the menu that shows the key mappings.. 
 
-What about pan and zoom?  Does Visualizer handle that, or Display..  pan means moving some elements out of the painted canvas and moving others in..  zoom does too, in addition to calculating new transforms for each element painted..  So, if Display does this, then it must either have all the visual elements in it, or else it much send a request to Visualizer that triggers sending what's needed..
+-] make code that draws the "menu" rectangle
+- -] give it a z that is in front of the other surfaces, perhaps 80% opaque
 
-Soooo..  make a two-way path between Display and Visualizer, in order to handle pan, zoom, 3D rotates, and so forth?
+-] hit 'e' key near an elem box, have an arrow spring out, from "portsOut" to the cursor.
 
-Orrrr..  leave that to the MVDM loop..  the pan/zoom/rotate gestures go into the command-maker, and thence into the visualizer, which then sends view update..
+-] move cursor, have the arrow track the cursor
 
-sooo..  this view update stuff..  does Display keep a full representation of the visual elements, and then translate that into Famo.us elements?  Or, does it keep, say, a current visualizer list..  where visualizer updates simply modify the previous list sent..  then Display translates the updated list into Famo.us elements..  given that Famo.us doesn't support removing render tree elements, that might be a good approach..  and it simplifies the thing about how to figure out what a visualizer update is and what to do with it inside the Display.
+-] hit 'e' key again near a different elem box, have the arrow terminate at "portsIn" of that elem box
 
-Okay.. now..  just need to figure out what the Visualizer actually sends..  how much detail..
+-] over empty background, hit 'a' key, have that pop up a new elem box
 
-You know what?  I don't want to think about it!  Just going to do something, see what happens, and then can modify later..  probably will never get modified, these choices have a way of sticking, due to momentum of volume of work and low improvement in changing..  but, don't want to stall myself, need to keep moving..
+-] near that elem box, hit 's', have that create a new properties box and connect an arrow from the elem box's "properties" over to the new properties box.  (If can't find a nearby elem or other properties box, then just make an orphan properties box?)
 
-sooooo...  something has to calculate placement of bounding boxes, and calculate translations and sizing..  and move things in and out based on zoom, pan, rotate..  and trigger redraws and resends of display data for graphs and calculation results..  seems like if put placement and transform calcs inside Display then are making the Display an active thing, giving it intelligence and control..  then, run into problems when have a view that is composed of pieces from many different holders and different processors..  for example, displaying a worksheet, where the worksheet itself is in a holder that generates a view, and locations on the worksheet are calculated by live processors, and locations are graphs which are generated by graphing processors that take calculations from other processors..  want the worksheet holder to handle generating the view, and collecting the data from the other processors..  don't want the Display to have any kind of intelligence related to this!  
+-] hit 'f' key, have it zoom in on the box under the cursor
 
-Hmmm..  so, if the worksheet holder is doing all of the collecting of data and triggering re-calcs, and melding together into a view..  then Display is simply passively painting that and collecting gestures that it sends back..  the holder then knows what to do with the gestures performed upon view elements..  
+-] inside the box, hit arrow keys to move cursor between fields
+- -] at each field, use space to pop up another menu and then space again to un-pop it..  
+- -] make this menu relate to the valid entries for the field.  For one field, show valid sequences that uniquely identify one of the valid values for the field (ex, for the "element type" field).
+- -] make menu be hierarchical -- first menu chooses a field via a key -- second menu shows all unique sequences for values in the field
+- -] have the menu for the "variable Name" field simply say "type in alpha-numeric text, which can include spaces but no other whitespace)
 
-So that means that the Display should not be calculating pan and zoom and rotate!!  Those are responses to gestures, and those trigger behaviors from the visualizer (which may, in turn, have to trigger behaviors from other processors in order to get updated calcs to put into the view)
+========================================================
 
-Got it, so as tempting as it is to peel off such gestures in the Display and build intelligence into there..  it will cause problems..  so best to have all the visual related processing be done inside the visualizers..  
-
-so..  means the visualizer should send out things pretty close to renderable..
-
-Now.  The question comes up..  what format?  Does the visualizer send out SVG?  Is that universal enough?  Will that cause problems with non-browser based approaches?  If not SVG, then what?  Will need to represent paths..  does visualizer calculate Bezier curves and send those?  Or does it just say "here are end points, connect these with a smooth path"?  Does the visualizer calculate how to route arcs within a graph around the other nodes in an optimal way?  If the user supplies helpers by moving things, does the Display remember that, or the Visualizer?  
-
-Ahhhh..  okay..  if what the user to be able to affect the visual arrangement, then need to remember the gestures they give that are related to visual arrangement..  for example, they grab bezier control points and move them, in order to affect a curve, or add new points within a path in order to route it..  those things have to be remembered!  The Display has no place to store such things!!
-
-Right..  that means that the holder must store info related to viewing the holder contents!  sooooo..  the visualizer must be the thing that generates any details that a person may want to adjust.
-
-Right.  Any visual arrangement that a person might want to adjust must be stored inside the holder, and so the visualizer must be the thing that generates that level of detail.  Right.  Got it.
-
-So.  Yes.  That means that the visualizer must send out bounding boxes, translations, sizing, path points, control points, and so forth.  So.  Yes.  SVG is looking like a good way to go..  has to be something!  Can invent my own equivalent, which specifies paths, shapes, widths, and so forth..  but what is the gain?  The only potential is sending in binary, to save the overhead of SVG's text embodiment.  The savings worth the effort?  NO!
-
-Okay then.  SVG.  That is the visualizer's format for POP.  Or perhaps it just sends the values that go into the SVG?  The Display does the final conversion to text-based SVG format?  Hmmmm, what about custom syntax, which is SVG from the programmer?  Just send indication of SVG elements, together with the values?  Maybe enums for the SVG indicators, or something..
-
-Now.  Question is, how much effort?  Is it more effort to send a representation, then construct text-repr inside Display?  Or more effort to construct SVG text in visualizer and send it ready-made?
-
-Seems easier to just construct SVG text inside visualizer and send that.. 
-
-Heck, if send representation, then are already forcing SVG!  It doesn't constrain the Display if send the text form..  the display is just as free to convert the binary form to something else as it is to convert the text form to something else..  so if Display is not browser, and doesn't have SVG drawing primitives, it has to do the extra step of parsing SVG in order to extract the values from the text, and then generate whatever internal form it has, such as calculating paths or even pixels itself..  the extraction from text does not seem like a terribly large burden compared to the rest.
-
-Buuuut..  don't really care!  Going to generate text form inside visualizer, because, why not?  Then the Display only translates displayList elements into its internal thing that paints.  In the case of browser, Display translates display list into famo.us elements, placing the SVG verbatim onto famous surfaces, and makes the SVG bounding box the same as the famous surface size.
-
-In fact, display list is going to represent almost verbatim what a Famo.us render tree will look like!  It is a fairly universal declaration..  hierarchy of local visual contexts, with relationship among those contexts, including relative placement in 3D space and relative sizing from one to another.
-
-Alright, getting to it now..  display list will be a serialization of a hierarchy..  The top of the hierarchy is the view painted onto.  The Display tells the visualizer what the pixel dimensions are of the view.  The visualizer makes that the top level bounding box.  It then inserts bounding boxes within that, and inserts bounding boxes within those, and so forth down.  Each bounding box is either a hierarchy element, relationship element, or a painted element.  Hierarchy elements simply state what elements are included, and give their own bounding box.  Relationship elements are attached by the parent hierarchy element.  For example, it is the job of the parent to make sure all the children fit inside its bounding box.  The bounding box may be 2D or 3D.  A parent ensures the fit by attaching relationships to the children elements.  The relationships can be translations or scalings or rotations.. or actually any arbitrary 3D transform.  A hierarchy element knows nothing of the context in which it fits, so it has no way of attaching relationships to itself!  Each hierarchy element is responsible for ensuring that all descendants fit within its bounding box.  Any relationship attached to a hierarchy element is transitively applied to all descendants of the hierarchy element.  For example, if one is rotated in 3D, then it, together with all its contents, is rotated as a unit.  Each descendant maintains the same relationship to its parent as before..  but the entire bundle has been rotated as a unit!
-
-Great..  so that is the display list..  it is a serialization of that hierarchy.  A display update then assumes a given hierarchy, and says "change this relationship between this parent and this child" or "remove this parent and all descendants" etc..  in effect, it specifies a change to the hierarchical structure..
-
-Sooooo..  means that have two copies of the view hierarchy..  one inside the visualizer, which is serialized, and another inside the Display, which is translated into Display-local elements that are then painted.
-
-Not the most efficient..  hurts me..  but, well, what are you going to do?  What's better?  Need the flexibility of having the visualizer control all changes to the view hierarchy.. and need the visualizer to calculate all placement and path details so that user changes can be remembered inside the holder (without something clunky like "save this view modification info as a black box and hand it to the Display, which knows what it means" yuck, just begging for loss of sync when move from one Display to another or even upgrade the Display!)..  
-
-so, then, there's no way around having the visualizer internally represent the bounding box hierarchy as it constructs the details.  Thennnnn..  something must translate that representation into the internal Display representation!  The Display could have any native form internally..  canvas with paths drawn upon it, Java 2D, even just pixels, with all the code in between..  well, in effect, every Display ends up being everything between that hierarchy and on down to pixels!!
-
-So, could just hand the data structure from visualizer to the Display..?  This is fine if both are inside same hardware, sharing memory..  but need a serialization if Display has separate memory..  which it will if the src holder is on a server and the display is a browser on a client!
-
-Hmmm..  what about just handing the data structure to the Display for now..  can always add the serialization later, it's not functional!  :-)  Ahhh, yes.. less work.  Good.  Okay, will do that.  save serialization for later.  For now, in javascript, will build a src holder that saves syntax graph natively in JSON, as an internal data structure of the form made for GabePatterns.  The visualizer in the src holder will generate a view hierarchy from that data structure.  It will save any view related data within the syntax graph data structure as extra properties added to the nodes.  The visualizer will then hand a reference to the view hierarchy directly to the display object.  The display object will then generate famous elements from the view hierarcy elements.  View updates will simply be the visualizer changing the view hierarchy then calling the display with a reference to the changed hierarchy.
-
-Done.  Make it so.
-
-BTW, thinking to introduce another component, which is a helper, that maybe takes some higher level view form and generates the view hierarchy from that..  this will ease the burden on developers who make custom syntax.. it will act as a library for them, essentially..  (and, of course, there will be a serializer that turns a view hierarchy into a stream of visual objects sent to the Display, which will reconstruct the view hierarchy then translate that into into elements that it paints.. for now, that serializer is just JSON!  It has provision to translate javascript objects into text form, and then on the other side parse that text form to reproduce the javascript objects.. might need extra logic in order to recreate the links among parents and children.. not sure whether JSON can go deep that way..).
+ 
 
 
+ 
  
 
 

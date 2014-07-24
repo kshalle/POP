@@ -3,49 +3,24 @@
 // sub-properties, but a port node may not have sub-ports!
 
 //This uses require.js to create a module.  This module has the name of the
-// file (<currFileName>).  Inside the define, a number of data structures and 
+// file (POPDisplay).  Inside the define, a number of data structures and 
 // functions are created, then returned at the end.  The returned things are
 // what can be accessed by external functions that load this module, via
-// themselves using the require("<currFileName>") call
-
-
-//The syntax graph is being modified to include visualization information.
-//It may be cleaner to store visualization information separately, but it
-// turns out to be more convenient to place the visual info directly with
-// the thing visualized.
-//Will need to provide a means for each viewer to have their own separate
-// view information.  Also need a means for creating a default view that
-// a particular person's state gets reset to when others have modified
-// the graph too far for their old view info to make sense anymore..
-//This is a bit of a messy problem!  Making the view always fully dynamic,
-// computed on the fly would solve the issues, but it would take away the
-// programmer's experience of being able to tune the view to their preference.
-//So, for now, until get more experience and get deeper into this, just 
-// making all the view info be attached to the nodes as the graph is 
-// constructed.  The system guesses a placemnt, then it is up to the user
-// to move things around to suit their preference.  The movement can be 
-// automated later..  simplest approach for now is make all placement 
-// manual and save the placement inside the graph.  But will at least
-// make the info be stored in an array indexed by user (separately
-// hash user-name which looks up the index of that user-name. Recycle indexes)
-define( function(require, exports, module) {
+// themselves using the require("POPDisplay") call
+define(function(require, exports, module) {
 
 //this is the top level handle to the syntax graph of the gabe transform rule
 var firstGabeTransformRule = {};
 
-//make a variable that holds an empty element struct.. this var will be used
+//make a variable that holds an empty element struct.. this var will used
 // to build up an element, and then reused to build up other elements 
 var tempElem = 
  { properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   [],
-   viewInfo:   []
+   subElems:   []
  };
  
-
-//tempElem.viewInfo = {};
-
 //the root of the Gabe Transform to the temp elem, then build up a property
 // to place into the elem.
 firstGabeTransformRule.root = tempElem; 
@@ -54,8 +29,7 @@ firstGabeTransformRule.root = tempElem;
 var tempProperty = 
  { propertyName: "TypeOfElement",
    propertyValue: "GabeTransformRule",
-   subProperties: [],
-   viewInfo:      []
+   subProperties: []
  }
  
 //attach it to the root elem
@@ -65,8 +39,7 @@ firstGabeTransformRule.root.properties[0] = tempProperty;
 var tempProperty = 
  { propertyName: "TypeOfSyntacticStructure",
    propertyValue: "syntacticHierarchy",
-   subProperties: [],
-   viewInfo:      []
+   subProperties: []
  }
 
 firstGabeTransformRule.root.properties[1] = tempProperty;
@@ -76,17 +49,15 @@ var tempElem =
  { properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   [],
-   viewInfo:   []
+   subElems:   []
  }
 
 firstGabeTransformRule.root.subElems[0] = tempElem;
 
 var tempProperty = 
- { propertyName:  "TypeOfElement",
+ { propertyName: "TypeOfElement",
    propertyValue: "GabeQueryPattern",
-   subProperties: [],
-   viewInfo:      []
+   subProperties: []
  }
  
 tempElem.properties[0] = tempProperty;
@@ -94,8 +65,7 @@ tempElem.properties[0] = tempProperty;
 var tempProperty =
  { propertyName: "TypeOfSyntacticStructure",
    propertyValue: "syntacticHierarchy",
-   subProperties: [],
-   viewInfo:      []
+   subProperties: []
  }
   
 tempElem.properties[1] = tempProperty;
@@ -107,8 +77,7 @@ var tempElem =
  { properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   [],
-   viewInfo:   []
+   subElems:   []
  }
 
 firstGabeTransformRule.root.subElems[1] = tempElem;
@@ -116,8 +85,7 @@ firstGabeTransformRule.root.subElems[1] = tempElem;
 var tempProperty = 
  { propertyName: "TypeOfElement",
    propertyValue: "GabeReplacePattern",
-   subProperties: [],
-   viewInfo:      []
+   subProperties: []
  }
  
 tempElem.properties[0] = tempProperty;
@@ -125,8 +93,7 @@ tempElem.properties[0] = tempProperty;
 var tempProperty =
  { propertyName: "TypeOfSyntacticStructure",
    propertyValue: "syntacticHierarchy",
-   subProperties: [],
-   viewInfo:      []
+   subProperties: []
  }
   
 tempElem.properties[1] = tempProperty;

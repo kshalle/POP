@@ -11,28 +11,33 @@ define(function(require, exports, module) {
 	//get the Display object, which contains a function for passing a view
 	// hierarchy, which the Display then paints onto the screen
 	var POPDisplay = require('./POPDisplay');
-	
-	//invoke the module that paints a canned sub-piece of the gabe pattern
-	// syntax graph.. just so have something to see! (for now.. remove later)
-	require('./renderPOPSyntaxGraph');
-	
+		
 	//cause the source holder object to be made, which will in turn
 	// cause a graph of syntax objects to be built inside of it
 	// and also cause a visualizer object to be built inside of it
 	var srcHolder = require('./GabePatternSrcHolder');
 	
-	//connect the srcHolder to the Display
+	//back-link the visualizer, commander, and modifier
+	//Note: can have multiple triplets, one for each kind of visualization
+	// for example, these are for seeing graph form.. later will add a triple
+	// for seeing the custom syntax form
+	srcHolder.visualizer.setSrcHolder( srcHolder );
+	srcHolder.commander.setSrcHolder(  srcHolder );
+	srcHolder.modifier.setSrcHolder(   srcHolder );
+	
+	//connect the pieces together
 	//Not sure yet what final form this will take..  for now..
 	srcHolder.visualizer.connectToDisplay( POPDisplay );
+	POPDisplay.connectToCommander( srcHolder.commander );
+	srcHolder.commander.connectToModifier( srcHolder.modifier );
+	srcHolder.modifier.connectToSyntaxGraph( srcHolder.syntaxGraph );
+	srcHolder.modifier.connectToVisualizer( srcHolder.visualizer );
 	
-	//Trigger the visualizer to build a view hierarchy and pass that
-	// to the Display object, which in turn triggers the Display to build
-	// a famous render tree corresponding to the view hierarchy, which paints
-	// the syntax graph representation into the browser
-	//This isn't the correct final form of how the visualizer determines
-	// the portions of the graph to generate a view hierarchy from, but
-	// it works for now, while developing..
-	srcHolder.visualizer.setViewSubGraph( srcHolder.visualizer.syntaxGraph );
+	//run test on the modifier, which in turn sends a sub-graph to the
+	// visualizer, which in turn sends the view hierarchy attached to the
+	// graph to the Display, which converts the hierarchy into Famous
+	// render tree, which causes it to paint.
+	srcHolder.modifier.runTest( );	
 	
 	//Once the system is complete, the view will be initialized to whatever
 	// the last view was before suspend.  When first built, the srcHolder

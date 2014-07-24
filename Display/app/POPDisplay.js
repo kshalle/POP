@@ -12,51 +12,55 @@
 // what can be accessed by external functions that load this module, via
 // themselves using the require("POPDisplay") call
 define(function(require, exports, module) {
-    //Create the famous infrastructure, which is used for rendering on screen
-    var Engine           = require("famous/core/Engine");
-    var Surface          = require("famous/core/Surface");
-    var Modifier         = require("famous/core/Modifier");
-    var Transform 		 = require('famous/core/Transform');
-    var StateModifier 	 = require('famous/modifiers/StateModifier');
-    var ContainerSurface = require("famous/surfaces/ContainerSurface");
-	var EventHandler     = require('famous/core/EventHandler');
+//Create the famous infrastructure, which is used for rendering on screen
+var Engine           = require("famous/core/Engine");
+var Surface          = require("famous/core/Surface");
+var Modifier         = require("famous/core/Modifier");
+var Transform 		 = require('famous/core/Transform');
+var StateModifier 	 = require('famous/modifiers/StateModifier');
+var ContainerSurface = require("famous/surfaces/ContainerSurface");
+var EventHandler     = require('famous/core/EventHandler');
 
-	//make the context, which controls rendering to the screen
-	// once add something to this context, that add makes the thing visibly
-	// have effect.
-	//Note, these are available to the render function via the closure
-	// mechanism
-    var mainContext = Engine.createContext();
+var commander = {}; //set by POPApp via a function (defined below) 
 
-	var handleGesture = function( event ) {
-			//not sure this is the right form, but provide a handler for
-			// gestures made by the programmer/user
-			//This will make an object that pairs the gesture to the view
-			// element that is represented by the surface(s) involved in
-			// the gesture.
-			//It will then send the object to the command generator, which 
-			// is part of the source holder
-		console.log("handleGesture");
-	}
+//make the context, which controls rendering to the screen
+// once add something to this context, that add makes the thing visibly
+// have effect.
+//Note, these are available to the render function via the closure
+// mechanism
+var mainContext = Engine.createContext();
+
+var handleGesture = function( event ) {
+		//not sure this is the right form, but provide a handler for
+		// gestures made by the programmer/user
+		//This will make an object that pairs the gesture to the view
+		// element that is represented by the surface(s) involved in
+		// the gesture.
+		//It will then send the object to the command generator, which 
+		// is part of the source holder
+	console.log("handleGesture");
+}
+
+function acceptViewList (viewHierarchy) {
+	//Here, convert each view hierarchy element into an equivalent
+	// famous render tree node
 	
-	function acceptViewList (viewHierarchy) {
-		//access Display object and its values here, as a closure
-		console.log("POPDisplay: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].shape + " y: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].yOffset);
-		//Here, convert each view hierarchy element into an equivalent
-		// famous render tree node
-	
+	//during testing, log some known positions within the hierarchy
+	console.log("POPDisplay: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].shape + " y: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].yOffset);
+
 	//the root node is always a container, no matter what, and it always
 	// is placed at the user-view origin, no matter what
-    var rootContainer = new ContainerSurface({
-        size: [viewHierarchy.rootBox.width, viewHierarchy.rootBox.height], 
-        properties: {
-            overflow: 'hidden'
-        }
-    });
+	var rootContainer = new ContainerSurface({
+		size: [viewHierarchy.rootBox.width, viewHierarchy.rootBox.height], 
+		properties: {
+			overflow: 'hidden'
+		}
+	});
 	mainContext.add(rootContainer);
-	
-	//Each node in the hierarchy will have a corresponding famous container
-	// if the node has children.  The children will be offset relative to
+
+	//If a node in the hierarchy has children, then it will have a famous
+	// container that corresponds to itself.
+	//The children will be offset relative to
 	// the container's origin, and all will be transformed as a unit.
 	// the node may also have a shape, in which case a surface with no
 	// transform is added to the container.
@@ -78,82 +82,87 @@ define(function(require, exports, module) {
 	var parent = rootContainer; 
 	nextGenParentNodes.push( viewHierarchy.rootBox);
 	while( parent != undefined ) {
-	children = nextGenParentNodes.shift().subBoxes;
-	numChildren = children.length; 
-	console.log("numChildren: "+numChildren);
-	for( i=0; i < numChildren; i++) {
-		node = children[i];
-		console.log("nodeID: " + node.ID);
-		//check whether node has children -- if so, create a container so
-		// that all children transform together, and have same origin
-		if(node.subBoxes != null) {
-			newContainer = new ContainerSurface({
-				size: [node.width, node.height], 
-				properties: {
-					overflow: 'hidden'
+		children = nextGenParentNodes.shift().subBoxes;
+		numChildren = children.length; 
+		console.log("numChildren: "+numChildren);
+		for( i=0; i < numChildren; i++) {
+			node = children[i];
+			console.log("nodeID: " + node.ID);
+			//check whether node has children -- if so, create a container so
+			// that all children transform together, and have same origin
+			if(node.subBoxes != null) {
+				newContainer = new ContainerSurface({
+					size: [node.width, node.height], 
+					properties: {
+						overflow: 'hidden'
+					}
+				});
+				newContMod = new StateModifier({
+					transform: Transform.translate(node.xOffset, node.yOffset, 0)
+				});
+				parent.add( newContMod ).add( newContainer );
+				//now check whether the node has a shape to render
+				if(node.shape != null) {
+					newSurface = new Surface({
+					  size: [node.width, node.height],
+					  content: node.shape
+					});
+					//no transform.. using transform applied to container
+					newContainer.add( newSurface );
 				}
-			});
-			newContMod = new StateModifier({
-				transform: Transform.translate(node.xOffset, node.yOffset, 0)
-			});
-			parent.add( newContMod ).add( newContainer );
-			//now check whether the node has a shape to render
+				//now add to list of parents in next outer-loop
+				nextGenParentContainers.push( newContainer );
+				nextGenParentNodes.push( node );
+			}
+			//Does node have a shape to render?
 			if(node.shape != null) {
 				newSurface = new Surface({
 				  size: [node.width, node.height],
 				  content: node.shape
 				});
-				//no transform.. using transform applied to container
-				newContainer.add( newSurface );
+				//for this case, need a transform for the x and y offsets
+				newSurfMod = new StateModifier({
+					transform: Transform.translate(node.xOffset, node.yOffset, 0)
+				});
+				parent.add( newSurfMod ).add( newSurface );
 			}
-			//now add to list of parents in next outer-loop
-			nextGenParentContainers.push( newContainer );
-			nextGenParentNodes.push( node );
 		}
-		//node has no children.. does it have a shape to render?
-		if(node.shape != null) {
-			newSurface = new Surface({
-			  size: [node.width, node.height],
-			  content: node.shape
-			});
-			//for this case, need a transform for the x and y offsets
-			newSurfMod = new StateModifier({
-				transform: Transform.translate(node.xOffset, node.yOffset, 0)
-			});
-			parent.add( newSurfMod ).add( newSurface );
-		}
+		//finished all children of this node.. get new parent
+		parent = nextGenParentContainers.shift();
 	}
-	//finished all children of this node.. change parent
-	parent = nextGenParentContainers.shift();
-	}
-	}
-	
-	function init() {
-		console.log("init");
-		//	var POPStuffToDraw = 
-		var mySurface = new Surface({
-		  size: [100, 100],
-		  content: '<svg width="100" height="80"><rect x="30" y="10" rx="20" ry="20" width="50" height="50" style="fill:red;stroke:black;stroke-width:3;opacity:0.5">',
-		  properties: {
-			color: 'white',
-			lineHeight: '200%',
-			textAlign: 'center',
-			fontSize: '36px',
-			cursor: 'pointer'
-		  }
-		});
-		var stateModifier = new StateModifier({
-			transform: Transform.translate(250, 100, 0)
-		});
-		mainContext.add(stateModifier).add(mySurface);
-	}
+}
 
+function init() {
+	console.log("init");
+	//	var POPStuffToDraw = 
+	var mySurface = new Surface({
+	  size: [100, 100],
+	  content: '<svg width="100" height="80"><rect x="30" y="10" rx="20" ry="20" width="50" height="50" style="fill:red;stroke:black;stroke-width:3;opacity:0.5">',
+	  properties: {
+		color: 'white',
+		lineHeight: '200%',
+		textAlign: 'center',
+		fontSize: '36px',
+		cursor: 'pointer'
+	  }
+	});
+	var stateModifier = new StateModifier({
+		transform: Transform.translate(250, 100, 0)
+	});
+	mainContext.add(stateModifier).add(mySurface);
+}
 
-	return{
-		init: init,
-		handleGesture: handleGesture,
-		acceptViewList: acceptViewList
-	};
+function connectToCommander( commanderIn ) {
+	commander = commanderIn;
+	console.log("display connect to commander");
+}
+
+return{
+	init:               init,
+	connectToCommander: connectToCommander,
+	handleGesture:      handleGesture,
+	acceptViewList:     acceptViewList
+};
 });
 
 

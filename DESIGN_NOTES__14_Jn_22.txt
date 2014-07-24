@@ -40,8 +40,9 @@ The visualizer has fingers directly on the raw data, in whatever the internal fo
 
 -] Right, so one way to combine visualizers in a hierarchy, is for higher level visualizers to specify a lower-level one that is to fill in the internals of a given bounding box.  So the lower-level is sent the bounding box, and it generates a view hierarchy that fits inside of that.  Not sure whether the Display should be the one that sends the requests and integrates the various responses, or the Visualizer should send the requests and integrate the responses.
 
+
 ==============================================
-=
+=         Display   Design  
 =
 ==============================================
 So, question..  what do display list elements look like?  Does visualizer produce the layout, for example, specify a bounding box and position for each element, including text, lines, etc?  Does it produce the bezier curves in SVG that connect syntax graph elements?
@@ -72,12 +73,18 @@ so..  means the visualizer should send out things pretty close to renderable..
 
 Now.  The question comes up..  what format?  Does the visualizer send out SVG?  Is that universal enough?  Will that cause problems with non-browser based approaches?  If not SVG, then what?  Will need to represent paths..  does visualizer calculate Bezier curves and send those?  Or does it just say "here are end points, connect these with a smooth path"?  Does the visualizer calculate how to route arcs within a graph around the other nodes in an optimal way?  If the user supplies helpers by moving things, does the Display remember that, or the Visualizer?  
 
-Ahhhh..  okay..  if what the user to be able to affect the visual arrangement, then need to remember the gestures they give that are related to visual arrangement..  for example, they grab bezier control points and move them, in order to affect a curve, or add new points within a path in order to route it..  those things have to be remembered!  The Display has no place to store such things!!
+Ahhhh..  okay..  if want the user to be able to affect the visual arrangement, then need to remember the gestures they give that are related to visual arrangement..  for example, they grab bezier control points and move them, in order to affect a curve, or add new points within a path in order to route it..  those things have to be remembered!  The Display has no place to store such things!!
 
 Right..  that means that the holder must store info related to viewing the holder contents!  sooooo..  the visualizer must be the thing that generates any details that a person may want to adjust.
 
 Right.  Any visual arrangement that a person might want to adjust must be stored inside the holder, and so the visualizer must be the thing that generates that level of detail.  Right.  Got it.
 
+
+
+//========================  Visualizer Conclusions  ======================
+//
+//
+//========================================================================
 So.  Yes.  That means that the visualizer must send out bounding boxes, translations, sizing, path points, control points, and so forth.  So.  Yes.  SVG is looking like a good way to go..  has to be something!  Can invent my own equivalent, which specifies paths, shapes, widths, and so forth..  but what is the gain?  The only potential is sending in binary, to save the overhead of SVG's text embodiment.  The savings worth the effort?  NO!
 
 Okay then.  SVG.  That is the visualizer's format for POP.  Or perhaps it just sends the values that go into the SVG?  The Display does the final conversion to text-based SVG format?  Hmmmm, what about custom syntax, which is SVG from the programmer?  Just send indication of SVG elements, together with the values?  Maybe enums for the SVG indicators, or something..
@@ -88,7 +95,7 @@ Seems easier to just construct SVG text inside visualizer and send that..
 
 Heck, if send representation, then are already forcing SVG!  It doesn't constrain the Display if send the text form..  the display is just as free to convert the binary form to something else as it is to convert the text form to something else..  so if Display is not browser, and doesn't have SVG drawing primitives, it has to do the extra step of parsing SVG in order to extract the values from the text, and then generate whatever internal form it has, such as calculating paths or even pixels itself..  the extraction from text does not seem like a terribly large burden compared to the rest.
 
-Buuuut..  don't really care!  Going to generate text form inside visualizer, because, why not?  Then the Display only translates displayList elements into its internal thing that paints.  In the case of browser, Display translates display list into famo.us elements, placing the SVG verbatim onto famous surfaces, and makes the SVG bounding box the same as the famous surface size.
+Buuuut..  don't really care!  Going to generate text form inside visualizer, because, why not?  Then the Display only translates displayList elements into its internal thing that paints.  In the case of browser, Display translates display list into famo.us elements, placing the SVG verbatim onto famous surfaces, and makes the famous surface size the same as the SVG bounding box.
 
 In fact, display list is going to represent almost verbatim what a Famo.us render tree will look like!  It is a fairly universal declaration..  hierarchy of local visual contexts, with relationship among those contexts, including relative placement in 3D space and relative sizing from one to another.
 
@@ -108,10 +115,65 @@ Hmmm..  what about just handing the data structure to the Display for now..  can
 
 Done.  Make it so.
 
-BTW, thinking to introduce another component, which is a helper, that maybe takes some higher level view form and generates the view hierarchy from that..  this will ease the burden on developers who make custom syntax.. it will act as a library for them, essentially..  (and, of course, there will be a serializer that turns a view hierarchy into a stream of visual objects sent to the Display, which will reconstruct the view hierarchy then translate that into into elements that it paints.. for now, that serializer is just JSON!  It has provision to translate javascript objects into text form, and then on the other side parse that text form to reproduce the javascript objects.. might need extra logic in order to recreate the links among parents and children.. not sure whether JSON can go deep that way..).
+BTW, thinking to introduce another component, which is a helper for developers making custom syntax, that maybe takes some higher level view form and generates the view hierarchy from that..  this will act as a library for them, essentially..  (and, of course, there will be a serializer that turns a view hierarchy into a stream of visual objects sent to the Display, which will reconstruct the view hierarchy then translate that into elements that it paints.. for now, that serializer is just JSON!  It has provision to translate javascript objects into text form, and then on the other side parse that text form to reproduce the javascript objects.. might need extra logic in order to recreate the links among parents and children.. not sure whether JSON can go deep that way..).
+
+//======================================================
+//					Code Reuse
+//
+//======================================================
+
+Actually, there are multiple kinds of code re-use:
+-] in-line code, where have something that assumes a context (such as variables in the scope), and grabs what matches within that context and inserts that into the respective places inside its body.  For example, a macro does this, so do in-line functions.
+-] processors that are communicated with.  Many function calls are this -- other places in the code are other processors, that send parameters to the function, and receive back a return response.
+-] inheritance, where have a namespace hierarchy that is searched.. the context can be assigned to a variable, then a function name can be looked up within it (assigning an object to a variable equals assigning a namespace to a variable).  If the function name isn't found in the immediate context, then the parent(s) of that context is(are) searched, until the name is found.  So, code is re-used by making it accessible from a parent name-space.
+
+In POP, in-line code has four forms:
+-] meta-agents inside the syntax-graph/MVDM-loop, which contain code that is used as part of generating code that is inserted into the syntax graph.  For example, active syntax generates code at the point that the user gives the gesture to add it to the syntax graph.
+-] selecting a hierarchy unit to be deep-copied to the current hole in the syntax graph (the syntax-graph of the original is duplicated)
+-] selecting a hierarchy unit to be reference-inserted into the hole (the syntax graph of the original is hooked to, not duplicated)
+-] macros -- in POP these are both meta-agents and also deep copies.  The macro selects things from the code surrounding where it is placed, and sucks those inside itself, and puts in a copy thus modified, into the syntax graph.
+
+In POP, processor-communicated-with code has at least two forms:
+-] connecting the inputs and outputs of one code-processor to another (this can be implied, for example on a worksheet, or direct, using the MVDM loop while in System (OS) view)
+-] when sending a context to a processor-box, it creates a new processor to handle the incoming context.  That is equivalent to copies of the code at runtime, talking to each other -- the creation as well as the contents is communication..  but it's not like other forms, where inputs are connected to outputs!
+
+In POP, inheritance can be accomplished via the copy-by-reference mechanism, or via the send-a-namespace/context mechanism (simply insert the variable connected to the processor that you want to receive sent data.. same variable name in each context, connected to different processors == polymorphism..  and the parent context attached, that has functions attached to names in it == inheritance)
+
+In effect, POP has functional, object oriented, procedural, and declarative styles that can be done within it.  At least, the underlying mechanisms that set those things apart are all available within POP.
+
+==============================================================
+==
+==       Editor and Gesture and Commander and Modifier
+==
+==============================================================
+
+In famo.us, seeing putting up a rectangle that is placed in front of the others, and always in the plane of the camera, as the "menu"..
+
+always have a set of mappings to the keys -- these mappings are set by the commander inside the srcHolder -- they are specific to the kind of data being visualized.  In the case of code, for the moment, only visualizing the code in the form of a syntax graph (will do the custom syntax visualizer next -- it will have challenges don't want to get into just yet -- need a way to create syntax graphs and turn Gabe loose on search and match to patterns, so minimum path to that).
+
+So, seeing moving cursor around, and when hit a key, say the 'e' key, the port closest to the cursor will sprout an arrow that ends at the cursor..  the cursor is then moved to the target port and hitting e again locks onto there.. or perhaps just a left click, or perhaps space bar, etc..  choose in practice the one that feels most intuitive and convenient.
+
+When cursor is over empty background, hit a key, say the 'a' key, and that creates a new empty element box..  s creates a new empty properties box..  space bar brings up the menu that shows the key mappings.. or maybe ctl-space..
+
+another key zooms in on the elem or property box under the cursor
+
+inside the box, can hit a key to move cursor between fields -- at each field, can use space to pop up another menu and the un-pop it..  which has the starting sequences of the valid entries for the field (IE, a list of the elem types -- might itself be a hierarchical menu -- pick one of the keys or sequences from this menu, then that pops up another menu that has its own sequences or keys..  eventually a leaf is a value placed into that field) --  or the menu entry describes the format of what can be typed into the field (Ex, variable name format)
+
+===========
+Soooo..  to make this work..
+===========
+
+Each bounding box in famous has an event handler on it..  want the first enclosing bounding box to receive the event.  The bounding boxes must have parent links so that can navigate out to the boxes that enclose the target box.
+
+the event handler is fixed and generic to the Display..  however, the gestures understood are in an array that is given to the Display by the Commander.  When Display receives the "connect", it in turn sends a connect back to the Holder.  This asks for the Commander to be given to the Display.  It then tells the commander to give its gesture-handler pairs.
+
+In javascript, the "gesture-handler pairs" is an object that has a field for each gesture it understands, and the value of that field is the function that does the computation related to the gesture.  The function receives the event object, plus the smallest enclosing bounding box.
+
+The gesture-handler then turns the event plus bounding box into a command.  For example, if previously a gesture caused the start of the mode for typing text into a field -- say for entering the name of a variable -- then the gesture handler looks that up, within state enclosed with the gesture handler but shareable among different handlers.  The code then branches to where it extracts the key value from the event object.  It reuses a "key into field" command object, and packs it with data.  The data includes the model-object that is attached to the appropriate bounding box (the handler does the work of figuring out which bounding box corresponds to the syntax graph object that owns the field that is being typed into).  So, each bounding box has a back-link to the Model object that the shape inside the bounding box represents, where appropriate (IE, the bounding box for text has no back-link, but the bounding box for the element-box shape does have a back-link to the element object!)  Might make it just "useful info" -- for example, a text bounding box might include the name of the field of the object that the larger enclosing bounding box back-links to.  The gesture-handler will also extract any needed info from the event object, such as which key was pressed, and add that to the command-object.
+
+The command is then sent to the Modifier, which changes the back-linked-to syntax graph objects.  As part of that, it also modifies the visualized-sub-graph, and notifies the visualizer to update.
 
 
- 
 
 
 

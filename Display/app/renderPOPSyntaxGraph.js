@@ -142,9 +142,6 @@ define(function(require, exports, module) {
 	  size: [true, true],
       content: "portsIn",
       properties: {
-        color: 'black',
-        textAlign: 'left',
-        fontSize: '11px',
         cursor: 'pointer'
       }
 	});	
