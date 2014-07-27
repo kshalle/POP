@@ -118,8 +118,10 @@ Will, at some point, want topological visualization, which represents translatio
 ==
 ==========================================================
 
--] attach the view hierarchy to the syntax graph itself
-- -] The Display receives pointer to the hierarchy, but it is embedded within the syntax graph, as an extra field that exists in every node, but the field is not visualized.
+#-] attach the view hierarchy to the syntax graph itself
+#- -] The Display receives pointer to the hierarchy, but it is embedded within the syntax graph, as an extra field that exists in every node, but the field is not visualized.
+
+-] Be able to generate view hierarchy code from just data, calculated.
 
 -] make the Visualizer attach a handler fn to each bounding box
 - -] test that the smallest bounding box is what receives the event 

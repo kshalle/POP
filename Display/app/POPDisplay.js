@@ -41,99 +41,104 @@ var handleGesture = function( event ) {
 	console.log("handleGesture");
 }
 
-function acceptViewList (viewHierarchy) {
+function acceptViewList (viewRoot) {
 	//Here, convert each view hierarchy element into an equivalent
 	// famous render tree node
 	
 	//during testing, log some known positions within the hierarchy
-	console.log("POPDisplay: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].shape + " y: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].yOffset);
+	console.log("POPDisplay: " + viewRoot.children[0].shape + " y: " + viewRoot.children[0].children[2].yOffset);
 
 	//the root node is always a container, no matter what, and it always
 	// is placed at the user-view origin, no matter what
 	var rootContainer = new ContainerSurface({
-		size: [viewHierarchy.rootBox.width, viewHierarchy.rootBox.height], 
+		//For now, fixed root size.. later, will set according to window
+		// being displayed within..
+		size: [viewRoot.width, viewRoot.height], 
 		properties: {
 			overflow: 'hidden'
 		}
 	});
 	mainContext.add(rootContainer);
 
-	//If a node in the hierarchy has children, then it will have a famous
-	// container that corresponds to itself.
+	//If a viewBox in the hierarchy has children, then make a famous
+	// container that corresponds to it.
 	//The children will be offset relative to
 	// the container's origin, and all will be transformed as a unit.
-	// the node may also have a shape, in which case a surface with no
-	// transform is added to the container.
+	// The viewBox may also have a shape, in which case a surface with the
+	// shape, but no transform, is added to the container.
 	//While traversing the hierarchy, keep two queues of upcoming "parents"
-	// one for parent containers, the other for the nodes that correspond
+	// one for parent containers, the other for the viewBoxs that correspond
 	// to those containers.  The container queue controls the loop "end"
 	// condition..
-	//Each time find a node that has children, push that node into a queue
-	// and push the node's newly made container into a queue
+	//Each time find a viewBox that has children, push that viewBox into a queue
+	// and push the viewBox's newly made container into a queue
 	//When done with all current children, grab the oldest parent from the
 	// queues.
 	//
 	//So, set up for these loops..
-	var node = {}; var newSurface; var newSurfMod = {}; 
+	var viewBox = {}; var newSurface = {}; var newSurfMod = {};
 	var newContainer = {}; var newContMod = {}; 
 	var i = 0; var numChildren = 0; 
 
-	var nextGenParentContainers = []; var nextGenParentNodes = [];
-	var parent = rootContainer; 
-	nextGenParentNodes.push( viewHierarchy.rootBox);
-	while( parent != undefined ) {
-		children = nextGenParentNodes.shift().subBoxes;
-		numChildren = children.length; 
-		console.log("numChildren: "+numChildren);
+	var nextGenParents = []; var parentContainer = {}; var viewBoxChildren = [];
+	nextGenParents.push( {viewBox: viewRoot, container: rootContainer});
+	//loop, getting oldest parent pair in queue each time
+	while( (parentPair = nextGenParents.shift()) != undefined ) {
+		parentContainer = parentPair.container;
+		viewBoxChildren = parentPair.viewBox.children;
+		numChildren = viewBoxChildren.length; 
+		console.log("numChildren: " + numChildren);
+
 		for( i=0; i < numChildren; i++) {
-			node = children[i];
-			console.log("nodeID: " + node.ID);
-			//check whether node has children -- if so, create a container so
-			// that all children transform together, and have same origin
-			if(node.subBoxes != null) {
+			viewBox = viewBoxChildren[i];
+			console.log("viewBoxID: " + viewBox.ID);
+			//check whether viewBox has children -- if so, create a 
+			// container so that all children transform together, and
+			// have same origin
+			if(viewBox.children.length != 0) {
 				newContainer = new ContainerSurface({
-					size: [node.width, node.height], 
+					size: [viewBox.width, viewBox.height], 
 					properties: {
 						overflow: 'hidden'
 					}
 				});
 				newContMod = new StateModifier({
-					transform: Transform.translate(node.xOffset, node.yOffset, 0)
+					transform: Transform.translate(viewBox.xOffset, viewBox.yOffset, 0)
 				});
-				parent.add( newContMod ).add( newContainer );
-				//now check whether the node has a shape to render
-				if(node.shape != null) {
+				//add child container and its transform to parent container
+				parentContainer.add( newContMod ).add( newContainer );
+				//now check whether the viewBox has a shape to render
+				if(viewBox.shape != null) {
 					newSurface = new Surface({
-					  size: [node.width, node.height],
-					  content: node.shape
+					  size: [viewBox.width, viewBox.height],
+					  content: viewBox.shape
 					});
 					//no transform.. using transform applied to container
 					newContainer.add( newSurface );
 				}
 				//now add to list of parents in next outer-loop
-				nextGenParentContainers.push( newContainer );
-				nextGenParentNodes.push( node );
+				nextGenParents.push( {viewBox: viewBox, container: newContainer} );
 			}
-			//Does node have a shape to render?
-			if(node.shape != null) {
+			//Does viewBox have a shape to render?
+			if(viewBox.shape != null) {
 				newSurface = new Surface({
-				  size: [node.width, node.height],
-				  content: node.shape
+				  size: [viewBox.width, viewBox.height],
+				  content: viewBox.shape
 				});
 				//for this case, need a transform for the x and y offsets
 				newSurfMod = new StateModifier({
-					transform: Transform.translate(node.xOffset, node.yOffset, 0)
+					transform: Transform.translate(viewBox.xOffset, viewBox.yOffset, 0)
 				});
-				parent.add( newSurfMod ).add( newSurface );
+				parentContainer.add( newSurfMod ).add( newSurface );
 			}
 		}
-		//finished all children of this node.. get new parent
-		parent = nextGenParentContainers.shift();
+		//finished all children of this viewBox.. loop to get new parent
 	}
 }
 
 function init() {
 	console.log("init");
+    return;
 	//	var POPStuffToDraw = 
 	var mySurface = new Surface({
 	  size: [100, 100],

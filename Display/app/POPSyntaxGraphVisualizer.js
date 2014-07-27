@@ -8,9 +8,9 @@ define(function(require, exports, module) {
 var srcHolder = {};
 var DisplayToSendTo = {};
 
-var viewHierarchy = {};
+var viewRoot = {};
 
-var renderer = require('./renderPOPSyntaxGraph');	
+var renderer = require('./renderPOPSyntaxGraph');
 
 
 function init() {
@@ -20,6 +20,7 @@ function init() {
 
 function setSrcHolder( srcHolderIn ) {
 	srcHolder = srcHolderIn;
+	viewRoot = srcHolder.syntaxGraph.viewRoot;
 }
 
 function connectToDisplay( POPDisplay ) {
@@ -37,6 +38,16 @@ function connectToDisplay( POPDisplay ) {
 function setViewSubGraph( syntaxSubGraph ) {
 	//access Visualizer values here, as a closure
 	console.log("setViewSubGraph");
+
+	console.log("Visualizer -- view root ID: " + viewRoot.ID + " second text: " + viewRoot.children[0].shape + " y: " + viewRoot.children[0].children[1].yOffset);
+	
+	//for now, just send reference to the viewHierarchy -- make this 
+	// sane later (not sure whether will do a "class" and create 
+	// instance via new operator, or what..
+	DisplayToSendTo.acceptViewList( viewRoot );
+	
+	return;
+//===================================
 	//for first pass, just build the view hierarchy by hand
 	
 	//A view hierarchy consists of bounding boxes arranged in a
@@ -51,16 +62,16 @@ function setViewSubGraph( syntaxSubGraph ) {
 	//Later, will calculate all the box sizes and positions relative to
 	// parents, starting from the syntax graph
 	var gottenElem = renderer.getRootBox;
-	viewHierarchy.rootBox = {
+	viewRoot.rootBox = {
 		ID: gottenElem.ID,
 		type:	'container',
 		width: gottenElem.width,
 		height: gottenElem.height,
 		parent: null,
-		subBoxes: []
+		children: []
 	} //note, left out parent-relative position and shape!
-	var currParent = viewHierarchy.rootBox;
-	var children = currParent.subBoxes;
+	var currParent = viewRoot.rootBox;
+	var children = currParent.children;
 	//first child is the syntactic element box
 	var gottenElem = renderer.getElemBox;
 	children[0] = {
@@ -72,7 +83,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: []
+		children: []
 	}
 	//second child is the properties box attached to the first box
 	gottenElem = renderer.getPropertiesBox;
@@ -85,7 +96,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: []
+		children: []
 	}
 	console.log("box2: " + children[1].shape);
 	//third child is the bezier curve connecting the boxes
@@ -99,12 +110,12 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	
 	//now add the text to the elem box
 	currParent = children[0];
-	children = currParent.subBoxes; //set to subBoxes of elem box
+	children = currParent.children; //set to children of elem box
 	gottenElem = renderer.getText1_1_1;
 	children[0] = {
 		ID: gottenElem.ID,
@@ -115,7 +126,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	gottenElem = renderer.getText1_1_2;
 	children[1] = {
@@ -127,7 +138,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	gottenElem = renderer.getText1_1_3;
 	children[2] = {
@@ -139,7 +150,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	gottenElem = renderer.getText1_1_4;
 	children[3] = {
@@ -151,12 +162,12 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	
 	//now add the text to the properties box
-	currParent = viewHierarchy.rootBox.subBoxes[1];
-	children = currParent.subBoxes;
+	currParent = viewRoot.rootBox.children[1];
+	children = currParent.children;
 	gottenElem = renderer.getText1_2_1;
 	children[0] = {
 		ID: gottenElem.ID,
@@ -167,7 +178,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	gottenElem = renderer.getText1_2_2;
 	children[1] = {
@@ -179,7 +190,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
 	gottenElem = renderer.getText1_2_3;
 	children[2] = {
@@ -191,13 +202,13 @@ function setViewSubGraph( syntaxSubGraph ) {
 		yOffset: gottenElem.y,
 		shape: gottenElem.shape,
 		parent: currParent,
-		subBoxes: null
+		children: null
 	}
-	console.log("visual elem: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].shape + " y: " + viewHierarchy.rootBox.subBoxes[1].subBoxes[2].yOffset);
-	//for now, just send reference to the viewHierarchy -- make this 
+	console.log("Visualizer: " + viewRoot.children[0].children[2].shape + " y: " + viewRoot.children[0].children[2].yOffset);
+	//for now, just send reference to the viewRoot -- make this
 	// sane later (not sure whether will do a "class" and create 
 	// instance via new operator, or what..
-	DisplayToSendTo.acceptViewList( viewHierarchy );
+	DisplayToSendTo.acceptViewList( viewRoot );
 }
 
 return{
