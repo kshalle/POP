@@ -42,17 +42,46 @@ var syntaxGraph = require('./buildGabePatternSyntaxGraph');
 var persistTheGraph = function( theGraphRoot ) {
     var shadowGraphRoot = { rootElem, rootViewSet };
     var shadowRootElem = { portsIn: [], portsOut: [], linkedElems: [] };
-    var shadowRootViewSet = { elemViewTree: {}, viewSetLinks: [] };
+    var shadowRootViewSet = { syntaxElem: {}, elemViewTree: {}, viewSetLinks: [] };
     shadowGraphRoot.rootElem = shadowRootElem;
     shadowGraphRoot.rootViewSet = shadowRootViewSet;
 
 	startPersisting(); //send notice to web server that persist protocol is starting
-	visitNextElemAndPersistIt( theGraphRoot, shadowGraphRoot );
+    //save out the top level object that has the handles to the view hierarchy root
+    // and the root element.  Also persist the view hierarchy root because it doesn't
+    // fit cleanly to try to reach it from the root element..  by persisting it here,
+    // can then do a single recursive call and only pass the next syntax element to
+    // clean up.  Any view stuff will be reached from that element
+    var rootElem = theGraphRoot.rootElem; //save 'cause pointers about to be replaced
+    persistGraphRootAndViewSetRoot( theGraphRoot, shadowGraphRoot );
+	visitNextElemAndPersistIt( rootElem, shadowRootElem );
 	endPersisting();   //tell web server that persist protocol ended
 	
     //The graph has been stringified, all done, so now replace the pointers!
 //    visitNextElemAndReplacePointers( rootElem, shadowRootElem );
 }
+
+function persistGraphRootAndViewSetRoot( theGraphRoot, shadowGraphRoot ) {
+    //just save the stuff that's above the root elem..
+    // so, cut off pointers to anything below so JSON can stringify
+    shadowGraphRoot.rootViewSet.elemViewTree = theGraphRoot.rootViewSet.elemViewTree;
+    theGraphRoot.rootViewSet.elemViewTree = theGraphRoot.rootViewSet.elemViewTree.ID;
+
+    //should only be one view set link, that points to the view set of the root element
+    shadowGraphRoot.rootViewSet.viewSetLinks[0] = theGraphRoot.rootViewSet.viewSetLinks[0];
+    theGraphRoot.rootViewSet.viewSetLinks[0].subordinateViewSet =
+        theGraphRoot.rootViewSet.viewSetLinks[0].subordinateViewSet.ID;
+
+    //the root view set has an undefined pointer-to-element
+//    shadowGraphRoot.rootViewSet.syntaxElem = theGraphRoot.rootViewSet.syntaxElem;
+//    theGraphRoot.rootViewSet.syntaxElem = theGraphRoot.rootViewSet.syntaxElem.ID;
+
+    //now safe to be stringified with JSON..  so do it!
+    var stringOfGraphRoot = JSON.stringify( theGraphRoot );
+    console.log("JSON of graphRoot: " + stringOfGraphRoot );
+    persistString( stringOfGraphRoot )
+}
+
 //Contract: have already verified that this elem has not been visited before calling
 var visitNextElemAndPersistIt = function( elem, shadowElem ) {
 	//mark the element as having been visited
@@ -117,6 +146,9 @@ var visitNextElemAndPersistIt = function( elem, shadowElem ) {
         shadowElem.linkedElems[i] = elem.linkedElems[i];
         elem.linkedElems[i] = elem.linkedElems[i].ID;
     }
+
+    //now cut off view set from other view sets
+
     //this elem, and all objects reachable from it are now safe to be
     // stringified with JSON..  so do it!
     var stringOfElemNode = JSON.stringify( elem );

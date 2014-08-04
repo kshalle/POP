@@ -1,0 +1,14 @@
+
+[patterns]
+**.py = native
+**.txt = native
+**.c = native
+**.h = native
+**.cpp = native
+**.java = native
+**.class = bin
+**.jar = bin
+**.sh = native
+**.pl = native
+**.jpg = bin
+**.gif = bin

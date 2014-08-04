@@ -1,0 +1,14 @@
+nbproject
+Makefile
+build
+dist
+famous-starter-kit
+.git
+src/Default
+src/.settings
+src/.cproject
+src/.project
+.dep.inc
+glob:.cproject
+glob:.project
+glob:Debug
