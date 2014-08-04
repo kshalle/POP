@@ -1,11 +1,5 @@
 
 //This is testing scaffolding..
-//As of July 2, 2014:
-//instantiate a Display object
-//instantiate a srcHolder object
-//invoke the visualizer in the srcHolder object, passing it the Display object
-//this should cause the visualizer to generate a view hierarchy and
-// pass that to the Display, which then paints it
 define(function(require, exports, module) {
 	
 	//get the Display object, which contains a function for passing a view

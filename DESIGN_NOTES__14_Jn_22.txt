@@ -173,7 +173,75 @@ The gesture-handler then turns the event plus bounding box into a command.  For 
 
 The command is then sent to the Modifier, which changes the back-linked-to syntax graph objects.  As part of that, it also modifies the visualized-sub-graph, and notifies the visualizer to update.
 
+=====================================
+Okay, have a view-tree cross-linked to the basic syntax graph..  and it's working, being painted by the Display.
 
+Now, need to get a JSON dump of the syntax graph, store that on disk, and then get it back in, as objects in javascript.
 
+So, JSON does stringify for dumping, and parse from bringing it back in, and they even allow overrides and "translate/restore" functions for difficult values..
+
+The one issue is that they don't handle circular data structures, and the syntax graph has to be circular..  because a gesture can land anywhere in it, so have to be able to start at any point and navigate outward..  so ports have to be bi-directionally linked to each other, which is a circle.
+
+Now..  how to deal with that..  what approach to traverse the syntax graph, parse the pieces out as JSON, and then to reverse that..?
+
+I'm thinking just do a standard spanning tree algorithm, and turn all port links into IDs..  When push out.. overwrite, then do JSON stringify, then replace the links..  (means need exclusive access -- can't be sharing with others..)
+
+==
+So, the steps:
+-] start at root, get first element..
+-] it will have properties attached..
+-] it will have an array of ports in and array of ports out
+- -] these ports will have pointers back to the element.. those must be replaced with ID before stringify
+-] it will have array of linked elements..  those can potentially link back around in a circle..  replace those links with IDs before stringify
+-] visit each port
+- -] each may have pointers to paired ports..  replace these with IDs
+
+after that, can safely stringify the element, which will catch all the ports, and all the element properties and all the port properties
+
+Then, find the next element to visit..  do that by:
+-] visit all linkedElems
+-] visit all ports, and for each port, visit all paired ports, and for each of those, visit the linked elem.
+-] before visit an elem, save position are in -- on stack or in struct
+-] When visit elem, check whether marked as already visited.  If yes, restore position saved, if not, process as above.
+-] when all reachable neighbors of elem done, restore position saved before visiting elem.  If none, then are done.
+
+==
+Now, have view boxes attached to the elements (there is a tree of viewboxes for each element, which includes boxes for the ports and any visual cues caused by properties or derived from properties)
+
+disconnect the ones for this elem from the ones for other elems..  so a given box can only be reached from exactly one elem!
+
+Soooo..  what need is to have two separate kinds of hierarchy..  there is hierarchy for a single element node, which includes all of the things that are visualized for that element, including boxes for empty ports, and indicators of the boundary around what should be drawn inside the POSITION of a given port.  Call that an element-set.
+
+Then there is hierarchy between different element-sets..  for example, which other element goes inside a given port's boundary box.. this is what applies parental shift and scale transforms.
+   So there are some cases here..  element inside port of another element, and element that is a linked element of another.  Also case of ordered children of a common parent.
+   For example, in the Gabe Transform rule, there is a big blue arrow drawn between the query pattern sub-graph and the resultant pattern sub-graph..  the tail goes to the parent's first child, the tip to the second child, and the two children are arranged side-by-side inside of the bounding box of the parent..  where the parent has no shape, just a positioning of children rule and the blue arrow between children
+   
+So, it is up to the parent to decide position of each child hierarchy..  has to know the contents of the child hierarchies in order to calc the size of bounding box..  but, will deal with sizing later..  rely upon user interaction to get the sizing right..  do sizing as graph grows, one bit at a time..  for now, the parent has a translation and scale to apply to the child, while the child has its own declared size..  so, that is element-set to element-set
+
+So, each element set has rules about how to arrange things inside the set..  and another set of rules about how to arrange children or neighbor sets!
+
+So, the visualizer is the thing that knows the rules and calculates placement and size (scale)..  this results in artefacts: links between boxes and links between sets, and info on translate and scale!
+
+so within a set there is no scaling.
+
+between sets, either can state itself as reference for the pair, and then state a translation and scaling for the other.  It is an error for two directly linked to both state themselves the reference for the other.  However, a given set act as both a reference and a recipient, across different sets that are paired to it.
+
+So, it is the link from one element set to another where the reference designation lies along with the translation and scaling of the recipient
+
+Hmmmmmm..  means that a link between two viewbox-sets is a full object rather than just a pointer!
+
+Hmmmmmm..  want to specialize to the point that encode this distinction about element set versus simple viewbox?  What about making it a view-set box..  leaving out any notion of element?  Then it just says that view boxes can be grouped into sets that are treated as a single whole, as far as translation and scaling are concerned..
+
+Then, it is the visualizer that recognizes what gets put together as a view-set, and calculates the translations and scalings that one view-set imposes on another view-set..
+
+Take an example: Summation symbol..  the body is a separate view-set, but the summation view-set determines the scaling and position of the body set.  
+
+====================
+Implementation:
+-] create a view-set object
+-] two kinds of links in the view hierarchy.. 
+- -] the view set acts as root/head to its contained viewboxes, which form a tree.
+- -] the view set has array of objects that act as links to other view sets.  The link objects are shared by both view-sets, and back-link to the view sets.  The link objects form the glue.. a view-set determines the relative positions and sizes of other view sets via the link objects.  each view set knows only about the link objects it is connected to, 
+ 
 
 

@@ -10,7 +10,7 @@ var DisplayToSendTo = {};
 
 var viewRoot = {};
 
-var renderer = require('./renderPOPSyntaxGraph');
+//var renderer = require('./renderPOPSyntaxGraph');
 
 
 function init() {
@@ -20,7 +20,7 @@ function init() {
 
 function setSrcHolder( srcHolderIn ) {
 	srcHolder = srcHolderIn;
-	viewRoot = srcHolder.syntaxGraph.viewRoot;
+	viewRoot = srcHolder.syntaxGraph.rootViewSet;
 }
 
 function connectToDisplay( POPDisplay ) {
@@ -39,7 +39,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 	//access Visualizer values here, as a closure
 	console.log("setViewSubGraph");
 
-	console.log("Visualizer -- view root ID: " + viewRoot.ID + " second text: " + viewRoot.children[0].shape + " y: " + viewRoot.children[0].children[1].yOffset);
+	console.log("Visualizer -- view rootElem ID: " + viewRoot.ID + " second text: " + viewRoot.children[0].shape + " y: " + viewRoot.children[0].children[1].yOffset);
 	
 	//for now, just send reference to the viewHierarchy -- make this 
 	// sane later (not sure whether will do a "class" and create 
@@ -205,7 +205,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		children: null
 	}
 	console.log("Visualizer: " + viewRoot.children[0].children[2].shape + " y: " + viewRoot.children[0].children[2].yOffset);
-	//for now, just send reference to the viewRoot -- make this
+	//for now, just send reference to the rootViewSet -- make this
 	// sane later (not sure whether will do a "class" and create 
 	// instance via new operator, or what..
 	DisplayToSendTo.acceptViewList( viewRoot );

@@ -76,8 +76,8 @@ var textContent = "";
 
 //this is the top level handle to the syntax graph of the gabe transform rule
 var firstGabeTransformRule = {
-	root: {},
-	viewRoot: {}
+	rootElem: {},
+	rootViewSet: {}
 };
 
 //As create each node of the syntax graph, are going to give it a bounding
@@ -92,16 +92,32 @@ var firstGabeTransformRule = {
 // bounding box, and no other size or position is declared.  However, it
 // inherits the scalings and translations of ancestor boxes.
 
-//For the top of the hierarchy, make a bounding box that will be the ancestor
-// of all of the elements contained within the sub-graph that is the Gabe
-// Pattern syntax graph.
-//This bounding box is not the bounding box of the root syntax graph element!
+//For the entry point, make a view-set that will be the root from which
+// access the view things of the sub-graph that is the Gabe Pattern
+// syntax graph.
+//This view-set is not the view-set of the root syntax graph element!
 // So, the handle that holds the root must have a separate field that holds
 // the root of the view hierarchy.  From there, the view hierarchy can be
-// traversed..  note that each syntax graph node does have one or more 
-// bounding boxes that represent it, BUT hierarchy bounding boxes exist that
-// are not attached to any syntax graph element!  They can only be reached
-// by separately traversing the view hierarchy.
+// traversed..  
+//Each element in the syntax graph has a corresponding tree of view boxes
+// that visualize that element, along with its input boxes.  The bounding 
+// boxes in this tree can only be reached by going through the view-set,
+// the view-set is only attached to the element node in the syntax graph.
+//But view-sets are attached to each other view view-link objects!
+var tempViewSet = {
+	elemViewTree: {},
+	viewSetLinks: []
+}
+
+var tempViewSetLink = {
+	referenceViewSet: {},
+	subordinateViewSet: {},
+	xOffset: 0,
+	yOffset: 0,
+	scale: 1.0
+}
+tempViewSet.viewSetLinks
+firstGabeTransformRule.rootViewSet = tempViewSet;
 
 var tempViewBox = {
 	ID: undefined,
@@ -116,7 +132,7 @@ var tempViewBox = {
 	handlers: []	//array of objects -> { typeOfEvent, Fn }
 };
 
-//make the viewRoot bounding box
+//make the rootViewSet bounding box
 tempViewBox.ID = getNextID();
 tempViewBox.shape = undefined;
 tempViewBox.width = 1000;
@@ -130,16 +146,16 @@ tempViewBox.handlers.push({
 	fn: stdKeyHdlr
 });
 
-firstGabeTransformRule.viewRoot = tempViewBox;
 
 
 //make a variable that holds an empty element struct.. this var will be used
 // to build up an element, and then reused to build up other elements 
 var tempElem = 
- { properties: [],
+ { ID: getNextID(),
+   properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   [],
+   linkedElems:   [],
    viewBox:   {}
  };
  
@@ -161,26 +177,20 @@ var boxSVGFromParts1_1 = boxSVG[1] + BBox1_1w + boxSVG[2] + BBox1_1h + boxSVG[3]
 
 //make the root element's bounding box: shape, width, height, xOff, yOff, scale
 tempViewBox = makeNewViewBox( boxSVGFromParts1_1, BBox1_1w, BBox1_1h, 0, 0, 1.0 );
-console.log("root box ID: " + tempViewBox.ID );
-tempViewBox.shape = boxSVGFromParts1_1;
-tempViewBox.width = BBox1_1w;
-tempViewBox.height = BBox1_1h;
-tempViewBox.xOffset = box1_1x;
-tempViewBox.yOffset = box1_1y;
-tempViewBox.scale = 1.0;
+console.log("rootElem box ID: " + tempViewBox.ID );
 tempViewBox.handlers.push({
 	type: 'key',
 	fn: stdKeyHdlr
 });
 
 //now cross link everything -- the view box, it's parent, and the graph node
-tempViewBox.parent = firstGabeTransformRule.viewRoot;
-firstGabeTransformRule.viewRoot.children.push( tempViewBox );
+tempViewBox.parent = firstGabeTransformRule.rootViewSet;
+firstGabeTransformRule.rootViewSet.children.push( tempViewBox );
 tempElem.viewBox = tempViewBox;
 tempViewBox.linkedNode = tempElem;
 
 //Set the root of the Gabe Transform to be the temp elem
-firstGabeTransformRule.root = tempElem; 
+firstGabeTransformRule.rootElem = tempElem;
 
 //Do the view boxes for the text strings that are inside the SVG box
 
@@ -205,8 +215,10 @@ tempViewBox = makeNewViewBox( text1_1_1_SVG, rect.width, rect.height, 8, 8, 1.0 
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
 //cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.root.viewBox;
-firstGabeTransformRule.root.viewBox.children.push(tempViewBox);
+// it is a child of the viewbox attached to the root element
+tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
+firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
+//The other viewbox has a linked element, but this does not!!
 
 var text1_1_2_SVG = makeSVGTextStr("portsIn");
 txtSzEl.innerHTML = text1_1_2_SVG;
@@ -217,8 +229,8 @@ tempViewBox = makeNewViewBox( text1_1_2_SVG, rect.width, rect.height, 8, 25, 1.0
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
 //cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.root.viewBox;
-firstGabeTransformRule.root.viewBox.children.push(tempViewBox);
+tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
+firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
 
 var text1_1_3_SVG = makeSVGTextStr("portsOut");
 txtSzEl.innerHTML = text1_1_3_SVG;
@@ -229,10 +241,10 @@ tempViewBox = makeNewViewBox( text1_1_3_SVG, rect.width, rect.height, 8, 42, 1.0
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
 //cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.root.viewBox;
-firstGabeTransformRule.root.viewBox.children.push(tempViewBox);
+tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
+firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
 
-var text1_1_4_SVG = makeSVGTextStr("subElems");
+var text1_1_4_SVG = makeSVGTextStr("linkedElems");
 txtSzEl.innerHTML = text1_1_4_SVG;
 var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
@@ -241,8 +253,8 @@ tempViewBox = makeNewViewBox( text1_1_4_SVG, rect.width, rect.height, 8, 59, 1.0
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
 //cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.root.viewBox;
-firstGabeTransformRule.root.viewBox.children.push(tempViewBox);
+tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
+firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
 
 
 
@@ -256,7 +268,7 @@ var tempProperty =
  }
  
 //attach it to the root elem
-firstGabeTransformRule.root.properties[0] = tempProperty;
+firstGabeTransformRule.rootElem.properties[0] = tempProperty;
 
 //build and attach the second property
 var tempProperty = 
@@ -266,18 +278,19 @@ var tempProperty =
    viewBox:      []
  }
 
-firstGabeTransformRule.root.properties[1] = tempProperty;
+firstGabeTransformRule.rootElem.properties[1] = tempProperty;
 
 //now reuse tempElem to make the first sub-element of the root elem 
 var tempElem = 
- { properties: [],
+ { ID: getNextID(),
+   properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   [],
+   linkedElems:   [],
    viewBox:   []
  }
 
-firstGabeTransformRule.root.subElems[0] = tempElem;
+firstGabeTransformRule.rootElem.linkedElems[0] = tempElem;
 
 var tempProperty = 
  { propertyName:  "TypeOfElement",
@@ -301,14 +314,15 @@ tempElem.properties[1] = tempProperty;
 //Keep going, building up the graph that was drawn
 //make the second sub-element of the root elem, the replacement pattern 
 var tempElem = 
- { properties: [],
+ { ID: getNextID(),
+   properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   [],
+   linkedElems:   [],
    viewBox:   []
  }
 
-firstGabeTransformRule.root.subElems[1] = tempElem;
+firstGabeTransformRule.rootElem.linkedElems[1] = tempElem;
 
 var tempProperty = 
  { propertyName: "TypeOfElement",
@@ -331,13 +345,14 @@ tempElem.properties[1] = tempProperty;
 //Now, go back and fill in the rest of the query pattern
 //First, add the sub-elements of the query pattern node
 var tempElem = 
- { properties: [],
+ { ID: getNextID(),
+   properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   []
+   linkedElems:   []
  };
 
-firstGabeTransformRule.root.subElems[0].subElems[0] = tempElem;
+firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[0] = tempElem;
 
 var tempProperty = 
  { propertyName: "TypeOfElement",
@@ -366,7 +381,8 @@ tempElem.properties[1] = tempProperty;
 
 //now add the ports to this Command syntactic pattern
 var tempPort =
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -390,7 +406,8 @@ console.log("propertyName: " + fillText);
 
 
 var tempPort =
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -410,7 +427,8 @@ tempPort.properties[0] =
  
 
 var tempPort =
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -430,13 +448,14 @@ tempPort.properties[0] =
 
 //First command (push) done!  Now make second command (head)
 var tempElem = 
- { properties: [],
+ { ID: getNextID(),
+   properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   []
+   linkedElems:   []
  };
 
-firstGabeTransformRule.root.subElems[0].subElems[1] = tempElem;
+firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[1] = tempElem;
 
 //getting tired of the temp this and temp that, just make object directly
 tempElem.properties[0] = 
@@ -457,7 +476,8 @@ tempElem.properties[1] =
 
 //now add the ports to this Command syntactic pattern
 tempElem.portsIn[0] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -475,7 +495,8 @@ tempElem.portsIn[0].properties[0] =
 
 //next port
 tempElem.portsOut[0] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -494,7 +515,8 @@ tempElem.portsOut[0].properties[0] =
 
 //next port
 tempElem.portsOut[1] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -511,8 +533,8 @@ tempElem.portsOut[1].properties[0] =
  };
 
 //now pair the ports to each other
-var pushElem = firstGabeTransformRule.root.subElems[0].subElems[0];
-var popElem = firstGabeTransformRule.root.subElems[0].subElems[1];
+var pushElem = firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[0];
+var popElem = firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[1];
 
 pushElem.portsOut[0].pairedPorts[0] =
    popElem.portsIn[0];
@@ -525,13 +547,14 @@ popElem.portsIn[0].pairedPorts[0] =
 //Now do the replace pattern
 //========================================
 var tempElem = 
- { properties: [],
+ { ID: getNextID(),
+   properties: [],
    portsIn:    [],
    portsOut:   [],
-   subElems:   []
+   linkedElems:   []
  };
 
-firstGabeTransformRule.root.subElems[1].subElems[0] = tempElem;
+firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0] = tempElem;
 
 //This is the pass through command element
 tempElem.properties[0] = 
@@ -552,7 +575,8 @@ tempElem.properties[1] =
 
 //now add the ports to this Command syntactic pattern
 tempElem.portsIn[0] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -570,7 +594,8 @@ tempElem.portsIn[0].properties[0] =
 
 //next port
 tempElem.portsIn[1] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -589,7 +614,8 @@ tempElem.portsIn[1].properties[0] =
 
 //next port
 tempElem.portsOut[0] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -608,7 +634,8 @@ tempElem.portsOut[0].properties[0] =
 
 //next port
 tempElem.portsOut[1] = 
- { element: tempElem,
+ { ID: getNextID(),
+   element: tempElem,
    properties: [],
    pairedPorts: []
  };
@@ -626,9 +653,15 @@ tempElem.portsOut[1].properties[0] =
 
 //no paired ports in this one..  done done!!
 
+//dump the graph out to JSON file
+var foo = JSON.stringify(firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0].portsOut[1].properties);
+console.log("stringified JSON: " + foo );
+var object = JSON.parse( foo );
+console.log("parsed back from JSON: " + object[0].propertyName );
+
 //print a few things, just to make sure the data structs are correctly
 // created and can be traversed.
-var passThroughCmd = firstGabeTransformRule.root.subElems[1].subElems[0];
+var passThroughCmd = firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0];
 fillText = passThroughCmd.portsOut[1].properties[0].subProperties[0].propertyValue;
 console.log("propertyValue: " + fillText);
 
