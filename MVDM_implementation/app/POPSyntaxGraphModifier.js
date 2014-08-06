@@ -38,7 +38,7 @@ function runTest( ){
 // to the Display object, which in turn triggers the Display to build
 // a famous render tree corresponding to the view hierarchy, which paints
 // the syntax graph representation into the browser
-visualizer.setViewSubGraph( syntaxGraphRoot );
+visualizer.setViewSubGraph( syntaxGraphRoot.rootElem );
 }
 
 return{

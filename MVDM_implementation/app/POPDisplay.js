@@ -41,19 +41,26 @@ var handleGesture = function( event ) {
 	console.log("handleGesture");
 }
 
-function acceptViewList (viewRoot) {
+//acceptRootViewSet is the main trigger..  it causes the Display to build
+// a render tree out of the incoming view set.
+//BUG: need a way to limit the view sets that this crawls to, other wise it
+// will just find all the other view sets via the view set links and render
+// the entire graph!
+function acceptRootViewSet (rootViewSet) {
 	//Here, convert each view hierarchy element into an equivalent
 	// famous render tree node
 	
 	//during testing, log some known positions within the hierarchy
-	console.log("POPDisplay: " + viewRoot.children[0].shape + " y: " + viewRoot.children[0].children[2].yOffset);
+	console.log("POPDisplay: root view set: " + rootViewSet.ID);
 
-	//the root node is always a container, no matter what, and it always
-	// is placed at the user-view origin, no matter what
+    //====================================
+    //==  Build the Render tree
+    //====================================
+	//the root view set is a container, placed at the user-view origin
 	var rootContainer = new ContainerSurface({
 		//For now, fixed root size.. later, will set according to window
 		// being displayed within..
-		size: [viewRoot.width, viewRoot.height], 
+		size: [rootViewSet.width, rootViewSet.height],
 		properties: {
 			overflow: 'hidden'
 		}
@@ -81,7 +88,7 @@ function acceptViewList (viewRoot) {
 	var i = 0; var numChildren = 0; 
 
 	var nextGenParents = []; var parentContainer = {}; var viewBoxChildren = [];
-	nextGenParents.push( {viewBox: viewRoot, container: rootContainer});
+	nextGenParents.push( {viewBox: rootViewSet, container: rootContainer});
 	//loop, getting oldest parent pair in queue each time
 	while( (parentPair = nextGenParents.shift()) != undefined ) {
 		parentContainer = parentPair.container;
@@ -166,7 +173,7 @@ return{
 	init:               init,
 	connectToCommander: connectToCommander,
 	handleGesture:      handleGesture,
-	acceptViewList:     acceptViewList
+	acceptViewList:     acceptRootViewSet
 };
 });
 

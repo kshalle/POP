@@ -8,7 +8,7 @@ define(function(require, exports, module) {
 var srcHolder = {};
 var DisplayToSendTo = {};
 
-var viewRoot = {};
+var rootViewSet = {};
 
 //var renderer = require('./renderPOPSyntaxGraph');
 
@@ -20,7 +20,7 @@ function init() {
 
 function setSrcHolder( srcHolderIn ) {
 	srcHolder = srcHolderIn;
-	viewRoot = srcHolder.syntaxGraph.rootViewSet;
+	rootViewSet = srcHolder.syntaxGraph.rootViewSet;
 }
 
 function connectToDisplay( POPDisplay ) {
@@ -35,16 +35,33 @@ function connectToDisplay( POPDisplay ) {
 //2) it sends that view hierarchy to the Display
 //3) the Display creates an internal representation of the hierarchy
 //4) the Display paints that internal representation to some device
-function setViewSubGraph( syntaxSubGraph ) {
+function visualizeNewSubGraph( newSubGraphRootElem ) {
 	//access Visualizer values here, as a closure
-	console.log("setViewSubGraph");
+	console.log("visualizeNewSubGraph");
 
-	console.log("Visualizer -- view rootElem ID: " + viewRoot.ID + " second text: " + viewRoot.children[0].shape + " y: " + viewRoot.children[0].children[1].yOffset);
+    //Once developed, this is where the visualizer will calculate the
+    // positions and scales inside the view set links, and will fill in any
+    // newly needed view boxes.  For example when a new elem is added, then
+    // the visualizer has to create the view tree for it.
+    //When get to adding that functionality, may turn out that need to have
+    // side band comm between modifier and visualizer.. for example, when a
+    // "drag elem" command happens, then the only mod is a change to the view
+    // graph..  so have the modifier talk to the visualizer directly, passing
+    // along the change to the view.
+
+    //for now, just set the view root to be the view set attached to the elem
+    //Note: this is NOT the right behavior..  the root view set is often the
+    //      view set that is above the root element..  if the root elem's view
+    //      set is subordinate to any, then the one it is subordinate to should
+    //      be the root view set (I think.. have to see in practice).
+    rootViewSet = newSubGraphRootElem.viewSet;
+
+    console.log("Visualizer -- new root view set ID: " + rootViewSet.ID );
 	
 	//for now, just send reference to the viewHierarchy -- make this 
 	// sane later (not sure whether will do a "class" and create 
-	// instance via new operator, or what..
-	DisplayToSendTo.acceptViewList( viewRoot );
+	// instance via new operator, or what..)
+	DisplayToSendTo.acceptRootViewSet( rootViewSet );
 	
 	return;
 //===================================
@@ -62,7 +79,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 	//Later, will calculate all the box sizes and positions relative to
 	// parents, starting from the syntax graph
 	var gottenElem = renderer.getRootBox;
-	viewRoot.rootBox = {
+	rootViewSet.rootBox = {
 		ID: gottenElem.ID,
 		type:	'container',
 		width: gottenElem.width,
@@ -70,7 +87,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 		parent: null,
 		children: []
 	} //note, left out parent-relative position and shape!
-	var currParent = viewRoot.rootBox;
+	var currParent = rootViewSet.rootBox;
 	var children = currParent.children;
 	//first child is the syntactic element box
 	var gottenElem = renderer.getElemBox;
@@ -166,7 +183,7 @@ function setViewSubGraph( syntaxSubGraph ) {
 	}
 	
 	//now add the text to the properties box
-	currParent = viewRoot.rootBox.children[1];
+	currParent = rootViewSet.rootBox.children[1];
 	children = currParent.children;
 	gottenElem = renderer.getText1_2_1;
 	children[0] = {
@@ -204,18 +221,18 @@ function setViewSubGraph( syntaxSubGraph ) {
 		parent: currParent,
 		children: null
 	}
-	console.log("Visualizer: " + viewRoot.children[0].children[2].shape + " y: " + viewRoot.children[0].children[2].yOffset);
+	console.log("Visualizer: " + rootViewSet.children[0].children[2].shape + " y: " + rootViewSet.children[0].children[2].yOffset);
 	//for now, just send reference to the rootViewSet -- make this
 	// sane later (not sure whether will do a "class" and create 
 	// instance via new operator, or what..
-	DisplayToSendTo.acceptViewList( viewRoot );
+	DisplayToSendTo.acceptRootViewSet( rootViewSet );
 }
 
 return{
 	init: init,
 	setSrcHolder: setSrcHolder,
 	connectToDisplay: connectToDisplay,
-	setViewSubGraph: setViewSubGraph
+	setViewSubGraph: visualizeNewSubGraph
 };
 });
 

@@ -41,13 +41,149 @@ define( function(require, exports, module) {
 // is decided on a case by case basis.
 
 
-//Housekeeping.. define helper Fn.  Get next ID -- should be globally visible
-// and shared amongst all code..  need persistent counters, so must be closure
+//========================================================================
+//==
+//========================================================================
+//Housekeeping.. setup
+
+//this is the top level handle to the syntax graph of the gabe transform rule
+var firstGabeTransformRule = {
+    rootElem: {},
+    rootViewSet: {},
+};
+
 var currID = 0;
 var getNextID = function() {
 //        console.log("getNextID: " + currID );
-        return currID++;
+    return currID++;
 }
+
+//Using inheritance via prototype, to keep a running hash of objects
+// indexed by their ID -- ID is auto generated as the objects are created
+function ObjColl(){
+    currID = 0;   //private, will create one ObjColl and use as prototype
+    objColl = [];
+    this.getNextID = function( obj ) {
+        objColl[currID] = obj; //objColl and currID are in the closure!
+        return currID++;
+    };
+    this.getByID = function( ID ) {
+        return objColl[ID];
+    }
+}
+
+//test out this whole prototype thing, get it working..
+function AThing(name) {
+    this.name = name;
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    return this;
+}
+//create one ObjColl, which is separately accessible, and make it the
+// prototype of AThing
+var theObjColl = new ObjColl();
+AThing.prototype = theObjColl;
+AThing.prototype.constructor = AThing;
+
+var myThing0 = new AThing("my new thing 0");
+var myThing1 = new AThing("my new thing 1");
+var myThing2 = new AThing("my new thing 2");
+var myThing3 = new AThing("my new thing 3");
+
+
+console.log("test: " + theObjColl.getByID(1).name );
+
+//create a "class" of graph elements..  make an elem via the "new" call..
+function GraphElem() {
+  this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+  this.properties = [];
+  this.portsIn = [];
+  this.portsOut = [];
+  this.linkedElems = [];
+  this.viewSet = {}
+};
+GraphElem.prototype = theObjColl;
+GraphElem.prototype.constructor = GraphElem;
+
+function ViewSet() {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.syntaxElem = {};   //back link to the corresponding syntax graph element
+    this.rootViewBox = [];
+    this.viewSetLinks = [];
+}
+ViewSet.prototype = theObjColl;
+ViewSet.prototype.constructor = ViewSet;
+
+function ViewSetLink() {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.referenceViewSet = {};
+    this.subordinateViewSet = {};
+    this.xOffset = 0;
+    this.yOffset = 0;
+    this.scale = 1.0;
+}
+ViewSetLink.prototype = theObjColl;
+ViewSetLink.prototype.constructor = ViewSetLink;
+
+//the constructor for a ViewBox object
+function ViewBox() {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.shape = undefined;
+    this.width = 0;		//size of bounding box (before scaling)
+    this.height = 0;
+    this.xOffset = 0;		//offset moves self and all descendants rel to parent
+    this.yOffset = 0;
+    this.scale = 1.0;		//scale applies to self and all descendants
+    this.parent = undefined;	//allows traversing upward through hierarchy
+    this.children = [];	//these are children view bounding boxes
+    this.handlers = [];	//array of objects -> { typeOfEvent, Fn }
+}
+ViewBox.prototype = theObjColl;
+ViewBox.prototype.constructor = ViewBox;
+ViewBox.prototype.WithParams = function(shape, width, height, xOffset, yOffset, scale) {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.shape = shape;
+    this.width = width;		//size of bounding box (before scaling)
+    this.height = height;
+    this.xOffset = xOffset;		//offset moves self and all descendants rel to parent
+    this.yOffset = yOffset;
+    this.scale = scale;		//scale applies to self and all descendants
+    this.parent = undefined;	//allows traversing upward through hierarchy
+    this.children = [];	//these are children view bounding boxes
+    this.handlers = [];	//array of objects -> { typeOfEvent, Fn }
+    return this;
+}
+
+function GraphProperty() {
+    this.propertyName = "";
+    this.propertyValue = "";
+    this.subProperties = [];
+}
+GraphProperty.prototype = theObjColl;
+GraphProperty.prototype.constructor = GraphProperty;
+GraphProperty.prototype.WithParams = function(propertyName, propertyValue) {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.propertyName = propertyName;
+    this.propertyValue = propertyValue;
+    this.subProperties = [];
+    return this;
+}
+
+function GraphPort() {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.element = {};
+    this.properties = [];
+    this.pairedPorts = [];
+}
+GraphPort.prototype = theObjColl;
+GraphPort.prototype.constructor = GraphPort;
+GraphPort.prototype.WithElem = function(elem) {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
+    this.element = elem;
+    this.properties = [];
+    this.pairedPorts = [];
+    return this;
+}
+
 
 //So, for now, set up for generating SVG..  this and the code below that
 // uses it will move into the Visualizer at some point
@@ -74,68 +210,77 @@ document.body.appendChild(txtSzEl); //only need to append once then reuse
 
 var textContent = "";
 
-//this is the top level handle to the syntax graph of the gabe transform rule
-var firstGabeTransformRule = {
-	rootElem: {},
-	rootViewSet: {}
-};
+//===========================================================================
+//==
+//==     Build the Graph
+//==
+//===========================================================================
 
-//As create each node of the syntax graph, are going to give it a bounding
-// box, and place it inside of a parent bounding box.
-//Note that there are more view-hierarchy elements than there are syntax graph
-// nodes!  Not only does a single node get visualized by multiple boxes (Ex: 
-// each text string inside a node has its own bounding box!)..  but also, 
-// hierarchy nodes group together multiple syntax graph nodes, but have no
-// direct shape that of their own that is drawn.
+
+//make a variable that holds an empty element struct.. this shows the
+// structure of what's in an element node
+var tempElem = new GraphElem();
+
+//Set the root elem.
+firstGabeTransformRule.rootElem = tempElem;
+
+//=======================================================
+//==    Do the View Set
+//=======================================================
+
+//As create each node of the syntax graph, are going to link it to a view
+// set, which in turn has a tree of view boxes.  This tree consists of all
+// the visual elements related to that syntax graph element, including
+// properties attached, shapes that visualize the element, ports in and out
+// and so forth.
+//Note that there is one view-set for each element node, even if the elem
+// has no visual behavior.
+//Note also that there are often multiple view boxes for a single elem node!
+// Ex: each text string inside a node has its own bounding box!  There may
+// also be view boxes that have no shape, but just act as reference points
+// that apply translations and scalings to other boxes.
 
 //When create a bounding box, size and position are relative to the parent
 // bounding box, and no other size or position is declared.  However, it
 // inherits the scalings and translations of ancestor boxes.
 
-//For the entry point, make a view-set that will be the root from which
-// access the view things of the sub-graph that is the Gabe Pattern
-// syntax graph.
-//This view-set is not the view-set of the root syntax graph element!
-// So, the handle that holds the root must have a separate field that holds
+//Note that the root graph elem may just be, visually, one sibling amongst
+// many!  Hence, the root view set cannot be the view set of the root
+// graph elem.
+//So, for this particular instance of the Gabe Patter, make a root view-set
+// from which access the view-set of the root graph elem.
+//Hence, the handle that holds the root must have a separate field that holds
 // the root of the view hierarchy.  From there, the view hierarchy can be
-// traversed..  
+// traversed..
+
 //Each element in the syntax graph has a corresponding tree of view boxes
-// that visualize that element, along with its input boxes.  The bounding 
+// that visualize that element, and the input boxes.  The bounding
 // boxes in this tree can only be reached by going through the view-set,
 // the view-set is only attached to the element node in the syntax graph.
-//But view-sets are attached to each other view view-link objects!
-var tempViewSet = {
-    syntaxElem: {},   //back link to the corresponding syntax graph element
-	elemViewTree: {},
-	viewSetLinks: []
-}
+//But view-sets are attached to each other via view-link objects!
 
-var tempViewSetLink = {
-	referenceViewSet: {},
-	subordinateViewSet: {},
-	xOffset: 0,
-	yOffset: 0,
-	scale: 1.0
-}
-tempViewSet.viewSetLinks
+//here is the root view set, which is above the view set of the root elem
+var tempViewSet = new ViewSet();
 firstGabeTransformRule.rootViewSet = tempViewSet;
+tempViewSet.syntaxElem = undefined;
+tempViewSet.rootViewBox = undefined; //may change this, make it the
+//enclosing bounding box for the entire thing.
 
-var tempViewBox = {
-	ID: undefined,
-	shape: undefined,
-	width: 0,		//size of bounding box (before scaling)
-	height: 0,
-	xOffset: 0,		//offset moves self and all descendants rel to parent
-	yOffset: 0,
-	scale: 1.0,		//scale applies to self and all descendants
-	parent: undefined,	//allows traversing upward through hierarchy
-	children: [],	//these are children view bounding boxes
-	handlers: []	//array of objects -> { typeOfEvent, Fn }
-};
+//add a link object, that links between two view sets
+var tempViewSetLink = new ViewSetLink();
+tempViewSet.viewSetLinks[0] = tempViewSetLink;
+tempViewSetLink.referenceViewSet = firstGabeTransformRule.rootViewSet;
+tempViewSetLink.subordinateViewSet = new ViewSet();
+tempViewSetLink.subordinateViewSet.syntaxElem = firstGabeTransformRule.rootElem;
 
-//make the rootViewSet bounding box
-tempViewBox.ID = getNextID();
-tempViewBox.shape = undefined;
+//now, hook up the root elem to its newly created view set!
+tempViewSet = tempViewSetLink.subordinateViewSet;
+firstGabeTransformRule.rootElem.viewSet = tempViewSet;
+
+//this is what a view box looks like:
+var tempViewBox = new ViewBox();
+
+//make the root bounding box of the view tree for the root graph elem
 tempViewBox.width = 1000;
 tempViewBox.height = 700;
 tempViewBox.xOffset = 0;
@@ -143,24 +288,15 @@ tempViewBox.yOffset = 0;
 tempViewBox.scale = 1.0;
 tempViewBox.parent = undefined;
 tempViewBox.handlers.push({
-	type: 'key',
-	fn: stdKeyHdlr
+    type: 'key',
+    fn: stdKeyHdlr
 });
 
+//set this view box as the root of the view set
+tempViewSet.rootViewBox = tempViewBox;
+tempViewBox.parent = tempViewSet; //(type issues?)
 
-
-//make a variable that holds an empty element struct.. this var will be used
-// to build up an element, and then reused to build up other elements 
-var tempElem = 
- { ID: getNextID(),
-   properties: [],
-   portsIn:    [],
-   portsOut:   [],
-   linkedElems:   [],
-   viewBox:   {}
- };
- 
-//make svg box for the graph element..  but don't know the width yet!
+//Now make svg box for the root graph element..  but don't know the width yet!
 // hence, can't generate the svg string yet..  only after getting the
 // bounding boxes of all text inside the element can the final width
 // of the box be calculated, and then the svg string be generated
@@ -175,27 +311,22 @@ var box1_1w = 66; var box1_1h = 86; var box1_1pad = 2;
 var BBox1_1w = box1_1w + box1_1pad; var BBox1_1h = box1_1h + box1_1pad;
 
 var boxSVGFromParts1_1 = boxSVG[1] + BBox1_1w + boxSVG[2] + BBox1_1h + boxSVG[3] + '1' + boxSVG[4] + '1' + boxSVG[5] + '20' + boxSVG[6] + '20' + boxSVG[7] + box1_1w + boxSVG[8] + box1_1h + boxSVG[9] + 'none' + boxSVG[10] + 'red' + boxSVG[11] + '2' + boxSVG[12] + '1' + boxSVG[13];
+tempViewBox.shape = boxSVGFromParts1_1;
 
-//make the root element's bounding box: shape, width, height, xOff, yOff, scale
-tempViewBox = makeNewViewBox( boxSVGFromParts1_1, BBox1_1w, BBox1_1h, 0, 0, 1.0 );
-console.log("rootElem box ID: " + tempViewBox.ID );
+console.log("rootElem root view box ID: " + tempViewBox.ID );
+
+//add a handler for key down while over the shape for root elem
 tempViewBox.handlers.push({
 	type: 'key',
 	fn: stdKeyHdlr
 });
 
-//now cross link everything -- the view box, it's parent, and the graph node
-tempViewBox.parent = firstGabeTransformRule.rootViewSet;
-firstGabeTransformRule.rootViewSet.children.push( tempViewBox );
-tempElem.viewBox = tempViewBox;
-tempViewBox.linkedNode = tempElem;
-
-//Set the root of the Gabe Transform to be the temp elem
-firstGabeTransformRule.rootElem = tempElem;
+//save this view box to be the parent of the text's view boxes, which go inside it
+var tempParentViewBox = tempViewBox;
 
 //Do the view boxes for the text strings that are inside the SVG box
 
-//now set the SVG text string -- from this point down can be repeated 
+//set the SVG text string -- from this point down can be repeated
 // for multiple strings without removing or re-adding the element, nor
 // fiddling with the DOM
 textContent = "properties";
@@ -212,481 +343,245 @@ var gottenElem = document.getElementById("svgText"); //use ID of the text elem
 var rect = gottenElem.getBoundingClientRect();
 //make a new view box object and populate it for the text box
 //The x of 8 and y of 8 are fixed positions for an element node!
-tempViewBox = makeNewViewBox( text1_1_1_SVG, rect.width, rect.height, 8, 8, 1.0 );
+tempViewBox = new ViewBox().WithParams( text1_1_1_SVG, rect.width, rect.height, 8, 8, 1.0 );
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
-//cross link the view box, it's parent, and the graph node (if any)
-// it is a child of the viewbox attached to the root element
-tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
-firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
-//The other viewbox has a linked element, but this does not!!
+//add view box into the tree
+tempViewBox.parent = tempParentViewBox;
+tempParentViewBox.children.push(tempViewBox);
 
 var text1_1_2_SVG = makeSVGTextStr("portsIn");
 txtSzEl.innerHTML = text1_1_2_SVG;
 var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
 //The x of 8 and y of 25 are fixed positions for this text in an element node!
-tempViewBox = makeNewViewBox( text1_1_2_SVG, rect.width, rect.height, 8, 25, 1.0 );
+tempViewBox = new ViewBox().WithParams( text1_1_2_SVG, rect.width, rect.height, 8, 25, 1.0 );
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
-//cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
-firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
+//add view box into the tree
+tempViewBox.parent = tempParentViewBox;
+tempParentViewBox.children.push(tempViewBox);
 
 var text1_1_3_SVG = makeSVGTextStr("portsOut");
 txtSzEl.innerHTML = text1_1_3_SVG;
 var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
 //The x of 8 and y of 25 are fixed positions for this text in an element node!
-tempViewBox = makeNewViewBox( text1_1_3_SVG, rect.width, rect.height, 8, 42, 1.0 );
+tempViewBox = new ViewBox().WithParams( text1_1_3_SVG, rect.width, rect.height, 8, 42, 1.0 );
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
-//cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
-firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
+//add view box into the tree
+    tempViewBox.parent = tempParentViewBox;
+    tempParentViewBox.children.push(tempViewBox);
 
 var text1_1_4_SVG = makeSVGTextStr("linkedElems");
 txtSzEl.innerHTML = text1_1_4_SVG;
 var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
 //The x of 8 and y of 25 are fixed positions for this text in an element node!
-tempViewBox = makeNewViewBox( text1_1_4_SVG, rect.width, rect.height, 8, 59, 1.0 );
+tempViewBox = new ViewBox().WithParams( text1_1_4_SVG, rect.width, rect.height, 8, 59, 1.0 );
 tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
 
-//cross link the view box, it's parent, and the graph node (if any)
-tempViewBox.parent = firstGabeTransformRule.rootElem.viewBox;
-firstGabeTransformRule.rootElem.viewBox.children.push(tempViewBox);
+//add view box into the tree
+tempViewBox.parent = tempParentViewBox;
+tempParentViewBox.children.push(tempViewBox);
 
 
-
+//=========================================================
+//==
+//=========================================================
 
 //build the first property
-var tempProperty = 
- { propertyName: "TypeOfElement",
-   propertyValue: "GabeTransformRule",
-   subProperties: [],
-   viewBox:      []
- }
- 
+var tempProperty = new GraphProperty().WithParams("TypeOfElement", "GabeTransformRule");
+
 //attach it to the root elem
 firstGabeTransformRule.rootElem.properties[0] = tempProperty;
 
 //build and attach the second property
-var tempProperty = 
- { propertyName: "TypeOfSyntacticStructure",
-   propertyValue: "syntacticHierarchy",
-   subProperties: [],
-   viewBox:      []
- }
+tempProperty = new GraphProperty().WithParams("TypeOfSyntacticStructure", "syntacticHierarchy");
 
 firstGabeTransformRule.rootElem.properties[1] = tempProperty;
 
 //now reuse tempElem to make the first sub-element of the root elem 
-var tempElem = 
- { ID: getNextID(),
-   properties: [],
-   portsIn:    [],
-   portsOut:   [],
-   linkedElems:   [],
-   viewBox:   []
- }
+tempElem = new GraphElem();
 
 firstGabeTransformRule.rootElem.linkedElems[0] = tempElem;
 
-var tempProperty = 
- { propertyName:  "TypeOfElement",
-   propertyValue: "GabeQueryPattern",
-   subProperties: [],
-   viewBox:      []
- }
+tempProperty = new GraphProperty().WithParams("TypeOfElement", "GabeQueryPattern");
  
 tempElem.properties[0] = tempProperty;
 
-var tempProperty =
- { propertyName: "TypeOfSyntacticStructure",
-   propertyValue: "syntacticHierarchy",
-   subProperties: [],
-   viewBox:      []
- }
+tempProperty = new GraphProperty().WithParams("TypeOfSyntacticStructure", "syntacticHierarchy");
   
 tempElem.properties[1] = tempProperty;
 
 
 //Keep going, building up the graph that was drawn
 //make the second sub-element of the root elem, the replacement pattern 
-var tempElem = 
- { ID: getNextID(),
-   properties: [],
-   portsIn:    [],
-   portsOut:   [],
-   linkedElems:   [],
-   viewBox:   []
- }
+tempElem = new GraphElem();
 
 firstGabeTransformRule.rootElem.linkedElems[1] = tempElem;
 
-var tempProperty = 
- { propertyName: "TypeOfElement",
-   propertyValue: "GabeReplacePattern",
-   subProperties: [],
-   viewBox:      []
- }
+tempProperty = new GraphProperty().WithParams("TypeOfElement", "GabeReplacePattern");
  
 tempElem.properties[0] = tempProperty;
 
-var tempProperty =
- { propertyName: "TypeOfSyntacticStructure",
-   propertyValue: "syntacticHierarchy",
-   subProperties: [],
-   viewBox:      []
- }
+var tempProperty = new GraphProperty().WithParams("TypeOfSyntacticStructure", "syntacticHierarchy");
   
 tempElem.properties[1] = tempProperty;
 
 //Now, go back and fill in the rest of the query pattern
 //First, add the sub-elements of the query pattern node
-var tempElem = 
- { ID: getNextID(),
-   properties: [],
-   portsIn:    [],
-   portsOut:   [],
-   linkedElems:   []
- };
+tempElem = new GraphElem();
 
 firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[0] = tempElem;
 
-var tempProperty = 
- { propertyName: "TypeOfElement",
-   propertyValue: "Command",
-   subProperties: []
- };
+tempProperty = new GraphProperty().WithParams("TypeOfElement", "Command");
  
 tempElem.properties[0] = tempProperty;
 
-var tempProperty =
- { propertyName: "CommandID",
-   propertyValue: "GabePattPush",
-   subProperties: []
- };
+tempProperty = new GraphProperty().WithParams("CommandID", "GabePattPush");
 
 tempElem.properties[0].subProperties[0] = tempProperty;
 
- 
-var tempProperty =
- { propertyName: "TypeOfSyntacticStructure",
-   propertyValue: "syntacticPatternRoot",
-   subProperties: []
- };
+tempProperty = new GraphProperty().WithParams("TypeOfSyntacticStructure", "syntacticPatternRoot");
   
 tempElem.properties[1] = tempProperty;
 
 //now add the ports to this Command syntactic pattern
-var tempPort =
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
+tempPort = new GraphPort().WithElem( tempElem );
 
 tempElem.portsIn[0] = tempPort;
 
 //add properties to the port
-tempPort.properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "GabePattStack",
-      subProperties: []
-    }]
- };
+tempPort.properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempPort.properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "GabePattStack");
 
 //check that syntax was done correctly..
-fillText = tempPort.properties[0].subProperties[0].propertyName;
-console.log("propertyName: " + fillText);
+fillText = tempPort.properties[0].subProperties[0].propertyValue;
+console.log("check propertyValue should be GabePattStack: " + fillText);
 
-
-var tempPort =
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
+tempPort = new GraphPort().WithElem( tempElem );
 
 tempElem.portsIn[1] = tempPort;
 
 //add properties to the port
-tempPort.properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "float",
-      subProperties: []
-    }]
- };
- 
+tempPort.properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempPort.properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "float");
 
-var tempPort =
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
+tempPort = new GraphPort().WithElem( tempElem );
 
 tempElem.portsOut[0] = tempPort;
 
 //add properties to the port
-tempPort.properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "GabePattStack",
-      subProperties: []
-    }]
- };
+tempPort.properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempPort.properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "GabePattStack");
+
 
 //First command (push) done!  Now make second command (head)
-var tempElem = 
- { ID: getNextID(),
-   properties: [],
-   portsIn:    [],
-   portsOut:   [],
-   linkedElems:   []
- };
 
+tempElem = new GraphElem();
 firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[1] = tempElem;
+tempElem.properties[0] = new GraphProperty().WithParams("TypeOfElement", "Command");
+tempElem.properties[0].subProperties[0] = new GraphProperty().WithParams("CommandID", "GabePattPop");
 
-//getting tired of the temp this and temp that, just make object directly
-tempElem.properties[0] = 
- { propertyName: "TypeOfElement",
-   propertyValue: "Command",
-   subProperties: 
-    [{ propertyName: "CommandID",
-      propertyValue: "GabePattPop",
-      subProperties: []
-    }]
- };
-  
-tempElem.properties[1] = 
- { propertyName: "TypeOfSyntacticStructure",
-   propertyValue: "syntacticPatternRoot",
-   subProperties: []
- };
+tempElem.properties[1] = new GraphProperty().WithParams("TypeOfSyntacticStructure", "syntacticPatternRoot");
 
-//now add the ports to this Command syntactic pattern
-tempElem.portsIn[0] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
+tempPort = new GraphPort().WithElem( tempElem );
+
+tempElem.portsIn[0] = tempPort;
 
 //add properties to the port
-tempElem.portsIn[0].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "GabePattStack",
-      subProperties: []
-    }]
- };
+tempPort.properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempPort.properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "GabePattStack");
 
 //next port
-tempElem.portsOut[0] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
-
-//add properties to the port
-tempElem.portsOut[0].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "GabePattStack",
-      subProperties: []
-    }]
- };
-
+tempElem.portsOut[0] = new GraphPort().WithElem( tempElem );
+tempElem.portsOut[0].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempElem.portsOut[0].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "GabePattStack");
 
 //next port
-tempElem.portsOut[1] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
-
-//add properties to the port
-tempElem.portsOut[1].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "float",
-      subProperties: []
-    }]
- };
+tempElem.portsOut[1] = new GraphPort().WithElem( tempElem );
+tempElem.portsOut[1].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempElem.portsOut[1].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "float");
 
 //now pair the ports to each other
 var pushElem = firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[0];
 var popElem = firstGabeTransformRule.rootElem.linkedElems[0].linkedElems[1];
 
-pushElem.portsOut[0].pairedPorts[0] =
-   popElem.portsIn[0];
-popElem.portsIn[0].pairedPorts[0] =
-   pushElem.portsOut[0];
+pushElem.portsOut[0].pairedPorts[0] = popElem.portsIn[0];
+popElem.portsIn[0].pairedPorts[0] = pushElem.portsOut[0];
 
 //Done with the query pattern!
 
 //========================================
 //Now do the replace pattern
 //========================================
-var tempElem = 
- { ID: getNextID(),
-   properties: [],
-   portsIn:    [],
-   portsOut:   [],
-   linkedElems:   []
- };
-
-firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0] = tempElem;
 
 //This is the pass through command element
-tempElem.properties[0] = 
- { propertyName: "TypeOfElement",
-   propertyValue: "Command",
-   subProperties: 
-    [{ propertyName: "CommandID",
-      propertyValue: "GabePassThrough",
-      subProperties: []
-    }]
- };
+tempElem = new GraphElem();
+firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0] = tempElem;
+tempElem.properties[0] = new GraphProperty().WithParams("TypeOfElement", "Command");
+tempElem.properties[0].subProperties[0] = new GraphProperty().WithParams("CommandID", "GabePassThrough");
+tempElem.properties[1] = new GraphProperty().WithParams("TypeOfSyntacticStructure", "syntacticPatternRoot");
 
-tempElem.properties[1] = 
- { propertyName: "TypeOfSyntacticStructure",
-   propertyValue: "syntacticPatternRoot",
-   subProperties: []
- };
-
-//now add the ports to this Command syntactic pattern
-tempElem.portsIn[0] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
+tempElem.portsIn[0] = new GraphPort().WithElem( tempElem );
 
 //add properties to the port
-tempElem.portsIn[0].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "GabePattStack",
-      subProperties: []
-    }]
- };
+tempElem.portsIn[0].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempElem.portsIn[0].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "GabePattStack");
+
+tempElem.portsIn[1] = new GraphPort().WithElem( tempElem );
+
+//add properties to the port
+tempElem.portsIn[1].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempElem.portsIn[1].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "float");
 
 //next port
-tempElem.portsIn[1] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
-
-//add properties to the port
-tempElem.portsIn[1].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "float",
-      subProperties: []
-    }]
- };
-
+tempElem.portsOut[0] = new GraphPort().WithElem( tempElem );
+tempElem.portsOut[0].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempElem.portsOut[0].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "GabePattStack");
 
 //next port
-tempElem.portsOut[0] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
-
-//add properties to the port
-tempElem.portsOut[0].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "GabePattStack",
-      subProperties: []
-    }]
- };
-
-
-//next port
-tempElem.portsOut[1] = 
- { ID: getNextID(),
-   element: tempElem,
-   properties: [],
-   pairedPorts: []
- };
-
-//add properties to the port
-tempElem.portsOut[1].properties[0] =
- { propertyName: "TypeOfPort",
-   propertyValue: "dataComm",
-   subProperties: 
-    [{ propertyName: "TypeOfCommData",
-      propertyValue: "float",
-      subProperties: []
-    }]
- };
+tempElem.portsOut[1] = new GraphPort().WithElem( tempElem );
+tempElem.portsOut[1].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
+tempElem.portsOut[1].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "float");
 
 //no paired ports in this one..  done done!!
 
 //dump the graph out to JSON file
-var foo = JSON.stringify(firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0].portsOut[1].properties);
-console.log("stringified JSON: " + foo );
-var object = JSON.parse( foo );
-console.log("parsed back from JSON: " + object[0].propertyName );
+//var foo = JSON.stringify(firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0].portsOut[1].properties, null, '\t');
+//console.log("stringified JSON: " + foo );
+//var object = JSON.parse( foo );
+//console.log("parsed back from JSON: " + object[0].propertyName );
 
 //print a few things, just to make sure the data structs are correctly
 // created and can be traversed.
-var passThroughCmd = firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0];
-fillText = passThroughCmd.portsOut[1].properties[0].subProperties[0].propertyValue;
-console.log("propertyValue: " + fillText);
+//var passThroughCmd = firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0];
+//fillText = passThroughCmd.portsOut[1].properties[0].subProperties[0].propertyValue;
+//console.log("propertyValue: " + fillText);
 
 
 function stdKeyHdlr(e) {
 	console.log("bb event: " + e.type + " on: " + e.target.ID);
 }
 
-function makeNewViewBox(shape, width, height, x, y, scale){
-	var tempViewBox = {
-		ID: undefined,
-		shape: shape,
-		width: width,	//size of bounding box (before scaling)
-		height: height,
-		xOffset: x,		//offset moves self and all descendants rel to parent
-		yOffset: y,
-		scale: scale,	//scale applies to self and all descendants
-		parent: undefined,	//allows traversing upward through hierarchy
-		children: [],	//these are children view bounding boxes
-		handlers: []	//array of objects -> { typeOfEvent, Fn }
-	};
-    tempViewBox.ID = getNextID();
-	return tempViewBox;
-}
+//function makeNewViewBox(shape, width, height, x, y, scale){
+//	var tempViewBox = {
+//		ID: undefined,
+//		shape: shape,
+//		width: width,	//size of bounding box (before scaling)
+//		height: height,
+//		xOffset: x,		//offset moves self and all descendants rel to parent
+//		yOffset: y,
+//		scale: scale,	//scale applies to self and all descendants
+//		parent: undefined,	//allows traversing upward through hierarchy
+//		children: [],	//these are children view bounding boxes
+//		handlers: []	//array of objects -> { typeOfEvent, Fn }
+//	};
+//    tempViewBox.ID = firstGabeTransformRule.getNextID(tempViewBox);
+//	return tempViewBox;
+//}
 
 function makeSVGTextStr(textContent) {
 	return '<svg>  <text x="0" y="9" style="font-family: Arial; font-size: 11;fill:black;stroke:none" id="svgText">' + textContent + '</text> </svg>';
@@ -694,11 +589,9 @@ function makeSVGTextStr(textContent) {
 
 //when this module is "required", the require statement will return the
 // syntax graph data structure
+console.log("done building syntax graph")
 return firstGabeTransformRule;
 });
-
-
-
 
 
 
