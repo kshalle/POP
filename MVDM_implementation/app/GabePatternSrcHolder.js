@@ -9,7 +9,9 @@ var commander   = require('./POPSyntaxGraphCommander');
 var modifier    = require('./POPSyntaxGraphModifier');	
 var syntaxGraph = require('./buildGabePatternSyntaxGraph');
 
-var theObjColl = syntaxGraph.rootElem.prototype;
+var theObjColl = syntaxGraph.rootElem.__proto__.__proto__;
+function ConstructorBuffer(){
+}
 
 function ShadowGraphElem() {
     this.portsInShadows = [];
@@ -17,8 +19,11 @@ function ShadowGraphElem() {
     this.portsIn = [];
     this.portsOut = [];
     this.linkedElems = [];
+    this.viewSet = {};
 };
-ShadowGraphElem.prototype = theObjColl;
+var shadowGraphElemProto = new ConstructorBuffer();
+shadowGraphElemProto.__proto__ = theObjColl;
+ShadowGraphElem.prototype = shadowGraphElemProto;
 ShadowGraphElem.prototype.constructor = ShadowGraphElem;
 
 //==================================================
@@ -57,11 +62,7 @@ ShadowGraphElem.prototype.constructor = ShadowGraphElem;
 //     return to the position were in just before visiting this element
 //-] when no where to return to, then done! 
 var persistTheGraph = function( theGraphRoot ) {
-    var shadowGraphRoot = { rootElem: {}, rootViewSet: {} };
-    var shadowRootElem = new ShadowGraphElem();
-    var shadowRootViewSet = { syntaxElem: {}, elemViewTree: {}, viewSetLinks: [] };
-    shadowGraphRoot.rootElem = shadowRootElem;
-    shadowGraphRoot.rootViewSet = shadowRootViewSet;
+    var shadowGraphRoot = {};
 
 	startPersisting(); //send notice to web server that persist protocol is starting
     //save out the top level object that has the handles to the view hierarchy root
@@ -71,12 +72,12 @@ var persistTheGraph = function( theGraphRoot ) {
     // clean up.  Any view stuff will be reached from that element
     var rootElem = theGraphRoot.rootElem; //save 'cause pointers about to be replaced
     persistAnchorAndViewSetRoot( theGraphRoot, shadowGraphRoot );
-	visitNextElemAndPersistIt( rootElem, shadowRootElem );
-	endPersisting();   //tell web server that persist protocol ended
+	visitNextElemAndPersistIt( rootElem );
+//	endPersisting();   //tell web server that persist protocol ended
 
     //now, restore all the pointers, replacing the IDs with pointer to object
     restoreAnchorAndViewSetRoot( theGraphRoot, shadowGraphRoot );
-    visitNextElemAndRestoreIt( rootElem, shadowRootElem );
+    visitNextElemAndRestoreIt( rootElem );
 }
 
 function persistAnchorAndViewSetRoot( theGraphRoot, shadowGraphRoot ) {
@@ -106,94 +107,75 @@ function persistAnchorAndViewSetRoot( theGraphRoot, shadowGraphRoot ) {
 }
 
 //Contract: have already verified that this elem has not been visited before calling
-var visitNextElemAndPersistIt = function( elem, shadowElem ) {
+var visitNextElemAndPersistIt = function( elem ) {
 	//mark the element as having been visited
 	elem.isAlreadyVisited = true;
 
     //cut the back link going from the view set to the elem node
-    if(elem.viewSet.syntaxElem) {
-        shadowElem.viewSet.syntaxElem = elem.viewSet.syntaxElem;
+    if((elem.viewSet||{}).syntaxElem) {
         elem.viewSet.syntaxElem = elem.viewSet.syntaxElem.ID;
     }
 
-	//visit each port (save this position before visiting!)
+	//visit each port
     var elemToVisit = {}; var i = 0; var j = 0; var inPort = {};
     var ports = elem.portsIn; var numPorts = ports.length; var numPairedPorts = 0;
-	//as go along, save pointers into shadow element..
     for( j = 0; j < numPorts; j++ ) {
         inPort = ports[j];
         numPairedPorts = inPort.pairedPorts.length;
-		   //shadowElem may not have enough positions in portsIn array..
-//        shadowElem.portsIn.push({pairedPorts: []});
         //follow each pairedPort link
         for( i = 0; i < numPairedPorts; i++ ) {
             //process element linked to the paired port
             elemToVisit = inPort.pairedPorts[i].element;
             if( !elemToVisit.isAlreadyVisited ) {
-				//not visited yet, so doesn't have a shadow elem
-                var newShadowElem = new ShadowGraphElem();
-//      fixthis          shadowElem.portsIn[j].pairedPortShadows[i] = newShadowElem;
-                visitNextElemAndPersistIt(elemToVisit, newShadowElem );
+                visitNextElemAndPersistIt( elemToVisit );
             }
             //back from visit, replace pointer with ID of pointed to port
-//            shadowElem.portsIn[j].pairedPorts[i] = inPort.pairedPorts[i]; //first save it!
             inPort.pairedPorts[i] = inPort.pairedPorts[i].ID;
         }
-		//save and replace the element back-pointer in the port object
-//		shadowElem.portsIn[j].element = inPort.element;
+		//replace the element back-pointer in the port object
 		inPort.element = inPort.element.ID;
     }
     ports = elem.portsOut; numPorts = ports.length; var outPort = {};
     for( j = 0; j < numPorts; j++ ) {
         outPort = ports[j];
         numPairedPorts = outPort.pairedPorts.length;
-//        shadowElem.portsOut.push({pairedPorts: []});
         //follow each pairedPort link
         for( i = 0; i < numPairedPorts; i++ ) {
             //process element linked to the paired port
             elemToVisit = outPort.pairedPorts[i].element;
             if( !elemToVisit.isAlreadyVisited ) {
-                var newShadowElem = new ShadowGraphElem();
-//                shadowElem.portsOut[j].pairedPorts.push(newShadowElem);
-                visitNextElemAndPersistIt(elemToVisit, newShadowElem );
+                visitNextElemAndPersistIt( elemToVisit );
             }
             //when come back, replace pointer with ID of pointed to port
             outPort.pairedPorts[i] = outPort.pairedPorts[i].ID;
         }
-		//save and replace the element back-pointer in the port object
-//		shadowElem.portsOut[j].element = outPort.element;
+		//replace the element back-pointer in the port object
 		outPort.element = outPort.element.ID;
     }
     var numLinkedElems = elem.linkedElems.length;
     for( i = 0; i < numLinkedElems; i++ ) {
         if( !(elem.linkedElems[i].isAlreadyVisited) ) {
-            var newShadowElem = new ShadowGraphElem();
-//            shadowElem.linkedElems.push(newShadowElem);
-            visitNextElemAndPersistIt(elem.linkedElems[i], newShadowElem );
+            visitNextElemAndPersistIt( elem.linkedElems[i] );
         }
         //back from visit, replace pointer with ID of pointed to elem
-//        shadowElem.linkedElems[i] = elem.linkedElems[i];
         elem.linkedElems[i] = elem.linkedElems[i].ID;
     }
 
     //cut links to the view sets embedded within view set link objects
-    if(elem.viewSet.viewSetLinks) {
+    if((elem.viewSet||{}).viewSetLinks) {
         var viewSet = elem.viewSet;
         var numLinked = viewSet.viewSetLinks.length;
         var viewSetLink = {};
         for (i = 0; i < numLinked; i++) {
             viewSetLink = viewSet.viewSetLinks[i];
-            if (viewSetLink) {
-                var shadowLink = { referenceViewSet: {}, subordinateViewSet: {} };
-//                shadowLink.referenceViewSet = viewSetLink.referenceViewSet;
-//                shadowLink.subordinateViewSet = viewSetLink.subordinateViewSet;
+            if( viewSetLink ) {
                 viewSetLink.referenceViewSet = viewSetLink.referenceViewSet.ID;
                 viewSetLink.subordinateViewSet = viewSetLink.subordinateViewSet.ID;
             }
         }
     }
     //cut back-links to parent view boxes within view set tree
-    if(elem.viewSet.rootViewBox) {
+    if((elem.viewSet||{}).rootViewBox ) {
         walkViewTree( elem.viewSet.rootViewBox );
     }
 
@@ -206,6 +188,7 @@ var visitNextElemAndPersistIt = function( elem, shadowElem ) {
 
 //now that the graph, with its view sets, has been written out to JSON,
 // go back and restore the pointers, replacing the IDs with actual pointer.
+//Replace top pointers from a shadow, then after this can lookup pointers by ID
 function restoreAnchorAndViewSetRoot( theGraphRoot, shadowGraphRoot ) {
     //just copy the above code and reverse the direction of the assignments!
     theGraphRoot.rootElem = shadowGraphRoot.rootElem;
@@ -218,98 +201,99 @@ function restoreAnchorAndViewSetRoot( theGraphRoot, shadowGraphRoot ) {
 }
 
 //Contract: have already verified that this elem has not been visited before calling
-var visitNextElemAndRestoreIt = function( elem, shadowElem ) {
+var visitNextElemAndRestoreIt = function( elem ) {
     //mark the element as having been visited
     elem.isAlreadyVisited = false;  //all start at true, making false marks as restored
 
     //restore the back link going from the view set to the elem node
-    if(elem.viewSet.syntaxElem) {
-        elem.viewSet.syntaxElem = elem.getById(elem.viewSet.syntaxElem);
+    if((elem.viewSet||{}).syntaxElem) { //idiom makes safe when viewset undefined
+        elem.viewSet.syntaxElem = elem.getByID(elem.viewSet.syntaxElem);
     }
 
     //restore each port
     var elemToVisit = {}; var i = 0; var j = 0; var inPort = {};
-    var ports = elem.portsIn; var numPorts = ports.length; var numPairedPorts = 0;
-    //as go along, restore pointers from shadow element..
+    var portsIn = elem.portsIn; var numPorts = portsIn.length; var numPairedPorts = 0;
+    //as go along, restore pointers by looking them up
     for( j = 0; j < numPorts; j++ ) {
-        inPort = ports[j];
-        numPairedPorts = inPort.pairedPorts.length;
-        //follow each pairedPort link
+        inPort = portsIn[j];
+
         //restore the element back-pointer in the port object
-        inPort.element = shadowElem.portsIn[j].element;
+        inPort.element = inPort.getByID(inPort.element);
+
+        //follow each pairedPort link
+        numPairedPorts = inPort.pairedPorts.length;
         for( i = 0; i < numPairedPorts; i++ ) {
             //process element linked to the paired port
             //first, replace pointer to port
-            inPort.pairedPorts[i] = shadowElem.portsIn[j].pairedPorts[i];
-//verify this is right order -- do rest of restore on tis one before visit?
+            inPort.pairedPorts[i] = inPort.getByID(inPort.pairedPorts[i]);
             elemToVisit = inPort.pairedPorts[i].element;
-            if( elemToVisit.isAlreadyVisited ) { //if still marked from before
-                visitNextElemAndPersistIt(elemToVisit, shadowElem.portsIn[j].pairedPorts[i] );
+            if( typeof elemToVisit == 'number' ) {
+                //means the element back-pointer inside the port on the other end
+                // is still the ID..  IE, that port and its element not restored yet
+                visitNextElemAndRestoreIt( outPort.getByID(elemToVisit) );
+            }
+            else if( elemToVisit.isAlreadyVisited ) { //if still marked from before
+                //don't think this case will ever come up!  if elem not restored,
+                // then the elem's port's back pointer will still be an ID and above
+                // if() will catch it..
+                visitNextElemAndRestoreIt( elemToVisit );
             }
         }
     }
-    ports = elem.portsOut; numPorts = ports.length; var outPort = {};
+    var outPorts = elem.portsOut; numPorts = outPorts.length; var outPort = {};
     for( j = 0; j < numPorts; j++ ) {
-        outPort = ports[j];
+        outPort = outPorts[j];
+        //restore back link from outPort to its element
+        outPort.element = outPort.getByID(outPort.element);
         numPairedPorts = outPort.pairedPorts.length;
-        shadowElem.portsOut.push({pairedPorts: []});
-        //follow each pairedPort link
+        //visit each pairedPort link
         for( i = 0; i < numPairedPorts; i++ ) {
+            //restore the pointer to the paired port
+            outPort.pairedPorts[i] = outPort.getByID(outPort.pairedPorts[i]);
             //process element linked to the paired port
             elemToVisit = outPort.pairedPorts[i].element;
-            if( !elemToVisit.isAlreadyVisited ) {
-                var newShadowElem = { portsIn: [], portsOut: [], linkedElems: [] };
-                shadowElem.portsOut[j].pairedPorts.push(newShadowElem);
-                visitNextElemAndPersistIt(elemToVisit, newShadowElem );
+            if( typeof elemToVisit == 'number' ) {
+                //means the element back-pointer inside the port on the other end
+                // is still the ID..  IE, that port and its element not restored yet
+                visitNextElemAndRestoreIt( outPort.getByID(elemToVisit) );
             }
-            //when come back, replace pointer with ID of pointed to port
-            outPort.pairedPorts[i] = outPort.pairedPorts[i].ID;
+            else if( elemToVisit.isAlreadyVisited ) { //if needs restoring
+                //don't think this case will ever come up!  if not restored,
+                // then the elem back pointer will still be an ID and above
+                // if() will catch it..
+                visitNextElemAndRestoreIt( elemToVisit );
+            }
         }
-        //save and replace the element back-pointer in the port object
-        shadowElem.portsOut[j].element = outPort.element;
-        outPort.element = outPort.element.ID;
     }
     var numLinkedElems = elem.linkedElems.length;
     for( i = 0; i < numLinkedElems; i++ ) {
-        if( !(elem.linkedElems[i].isAlreadyVisited) ) {
-            var newShadowElem = { portsIn: [], portsOut: [], linkedElems: [] };
-            shadowElem.linkedElems.push(newShadowElem);
-            visitNextElemAndPersistIt(elem.linkedElems[i], newShadowElem );
+        //restore linked elem first, then process that restored elem
+        elem.linkedElems[i] = elem.getByID( elem.linkedElems[i] );
+        if( elem.linkedElems[i].isAlreadyVisited ) {
+            visitNextElemAndRestoreIt( elem.linkedElems[i] );
         }
-        //back from visit, replace pointer with ID of pointed to elem
-        shadowElem.linkedElems[i] = elem.linkedElems[i];
-        elem.linkedElems[i] = elem.linkedElems[i].ID;
     }
 
-    //cut links to the view sets embedded within view set link objects
-    if(elem.viewSet.viewSetLinks) {
+    //restore links to the view sets embedded within view set link objects
+    if( (elem.viewSet||{}).viewSetLinks ) {
         var viewSet = elem.viewSet;
-        var numLinked = viewSet.viewSetLinks.length;
+        var numLinked = viewSet.viewSetLinks.length; //array always exists
         var viewSetLink = {};
         for (i = 0; i < numLinked; i++) {
             viewSetLink = viewSet.viewSetLinks[i];
             if (viewSetLink) {
-                var shadowLink = { referenceViewSet: {}, subordinateViewSet: {} };
-                shadowLink.referenceViewSet = viewSetLink.referenceViewSet;
-                shadowLink.subordinateViewSet = viewSetLink.subordinateViewSet;
-                viewSetLink.referenceViewSet = viewSetLink.referenceViewSet.ID;
-                viewSetLink.subordinateViewSet = viewSetLink.subordinateViewSet.ID;
+                viewSetLink.referenceViewSet = elem.getByID(viewSetLink.referenceViewSet);
+                viewSetLink.subordinateViewSet = elem.getByID(viewSetLink.subordinateViewSet);
             }
         }
     }
-    //cut back-links to parent view boxes within view set tree
-    if(elem.viewSet.rootViewBox) {
-        walkViewTree( elem.viewSet.rootViewBox );
+    //restore back-links to parent view boxes within view set tree
+    if( (elem.viewSet||{}).rootViewBox ) { //idiom that's safe when viewSet undefine
+        walkViewTreeAndRestore( elem.viewSet.rootViewBox );
     }
-
-    //this elem, and all objects reachable from it are now safe to be
-    // stringified with JSON..  so do it!
-    var stringOfElemNode = JSON.stringify( elem, null, '\t' );
-    console.log("JSON of elem: " + stringOfElemNode );
-    persistString( stringOfElemNode );
 }
 
-    persistTheGraph( syntaxGraph );
+persistTheGraph( syntaxGraph );
 
 console.log("\npersisting graph done!\n")
 
@@ -332,12 +316,30 @@ function walkViewTree( viewBox ) {
 //    persistString( JSON.stringify(viewBox))
     console.log("done recursing viewBox: " + viewBox.ID)
 }
+//walk the tree, restoring all IDs with parent and children pointers
+function walkViewTreeAndRestore( viewBox ) {
+    //replace ID that's in the parent field with looked up object pointer
+    if(viewBox.parent) viewBox.parent = viewBox.getByID(viewBox.parent);
+    if(viewBox.children.length > 0) { //all view boxes should have array!
+        var childBox = {};
+        var numChildren = viewBox.children.length;
+        for (i = 0; i < numChildren; i++) {
+            viewBox.children[i] = viewBox.getByID(viewBox.children[i]);
+            childBox = viewBox.children[i];
+            if( childBox ) {
+                walkViewTree( childBox );
+            }
+        }
+    }
+    console.log("done restoring viewBox: " + viewBox.ID)
+}
 
 function startPersisting() {
 	//bottle server
 	var theUrl = "http://localhost:8080/startsavinggraph";
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.open( "GET", theUrl, false );
+    console.log("about to send start persisting command");
     xmlHttp.send( null );
     console.log("started persisting: " + xmlHttp.responseText );
 }
@@ -378,7 +380,7 @@ function endPersisting() {
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.open( "GET", theUrl, false );
     xmlHttp.send( null );
-    console.log("started persisting: " + xmlHttp.responseText );
+    console.log("end persisting: " + xmlHttp.responseText );
 }
 
 //================================

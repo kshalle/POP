@@ -86,7 +86,7 @@ function acceptRootViewSet (rootViewSet) {
 	var viewBox = {}; var newSurface = {}; var newSurfMod = {};
 	var newContainer = {}; var newContMod = {}; 
 	var i = 0; var numChildren = 0; 
-
+rewrite display to handle view sets!
 	var nextGenParents = []; var parentContainer = {}; var viewBoxChildren = [];
 	nextGenParents.push( {viewBox: rootViewSet, container: rootContainer});
 	//loop, getting oldest parent pair in queue each time
@@ -173,7 +173,7 @@ return{
 	init:               init,
 	connectToCommander: connectToCommander,
 	handleGesture:      handleGesture,
-	acceptViewList:     acceptRootViewSet
+    acceptRootViewSet:  acceptRootViewSet
 };
 });
 

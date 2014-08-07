@@ -3,8 +3,6 @@
 //Make a Visualizer object, and a number of functions that operate on it.
 // One of the functions accepts 
 define(function(require, exports, module) {
-//Create the famous infrastructure, which is used for rendering on screen
-
 var srcHolder = {};
 var DisplayToSendTo = {};
 

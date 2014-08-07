@@ -49,19 +49,14 @@ define( function(require, exports, module) {
 //this is the top level handle to the syntax graph of the gabe transform rule
 var firstGabeTransformRule = {
     rootElem: {},
-    rootViewSet: {},
+    rootViewSet: {}
 };
-
-var currID = 0;
-var getNextID = function() {
-//        console.log("getNextID: " + currID );
-    return currID++;
-}
 
 //Using inheritance via prototype, to keep a running hash of objects
 // indexed by their ID -- ID is auto generated as the objects are created
 function ObjColl(){
-    currID = 0;   //private, will create one ObjColl and use as prototype
+    //start at 1 because 0 is interpreted same a null and other special ways
+    currID = 1;   //private, will create one ObjColl and use as prototype
     objColl = [];
     this.getNextID = function( obj ) {
         objColl[currID] = obj; //objColl and currID are in the closure!
@@ -71,26 +66,14 @@ function ObjColl(){
         return objColl[ID];
     }
 }
-
-//test out this whole prototype thing, get it working..
-function AThing(name) {
-    this.name = name;
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-    return this;
-}
-//create one ObjColl, which is separately accessible, and make it the
-// prototype of AThing
 var theObjColl = new ObjColl();
-AThing.prototype = theObjColl;
-AThing.prototype.constructor = AThing;
 
-var myThing0 = new AThing("my new thing 0");
-var myThing1 = new AThing("my new thing 1");
-var myThing2 = new AThing("my new thing 2");
-var myThing3 = new AThing("my new thing 3");
-
-
-console.log("test: " + theObjColl.getByID(1).name );
+//need all the classes to have common ObjColl instance, but each has
+// different constructor!  So, each needs its own prototype instance, so
+// need to create an empty object to act as the prototype instance, so can
+// add the constructor to that instance
+function ConstructorBuffer(){
+}
 
 //create a "class" of graph elements..  make an elem via the "new" call..
 function GraphElem() {
@@ -99,9 +82,11 @@ function GraphElem() {
   this.portsIn = [];
   this.portsOut = [];
   this.linkedElems = [];
-  this.viewSet = {}
+  this.viewSet = undefined;
 };
-GraphElem.prototype = theObjColl;
+var graphElemProto = new ConstructorBuffer();
+graphElemProto.__proto__ = theObjColl;
+GraphElem.prototype = graphElemProto;
 GraphElem.prototype.constructor = GraphElem;
 
 function ViewSet() {
@@ -110,7 +95,9 @@ function ViewSet() {
     this.rootViewBox = [];
     this.viewSetLinks = [];
 }
-ViewSet.prototype = theObjColl;
+var viewSetProto = new ConstructorBuffer();
+viewSetProto.__proto__ = theObjColl;
+ViewSet.prototype = viewSetProto;
 ViewSet.prototype.constructor = ViewSet;
 
 function ViewSetLink() {
@@ -121,8 +108,16 @@ function ViewSetLink() {
     this.yOffset = 0;
     this.scale = 1.0;
 }
-ViewSetLink.prototype = theObjColl;
+var viewSetLinkProto = new ConstructorBuffer();
+viewSetLinkProto.__proto__ = theObjColl;
+ViewSetLink.prototype = viewSetLinkProto;
 ViewSetLink.prototype.constructor = ViewSetLink;
+
+//var a = new GraphElem();
+//var b = new ViewSet();
+//b.syntaxElem = 0;
+//var c = new ViewSetLink();
+//console.log("constructor test.. syntaxElem: " + c.getByID(1).syntaxElem);
 
 //the constructor for a ViewBox object
 function ViewBox() {
@@ -137,34 +132,33 @@ function ViewBox() {
     this.children = [];	//these are children view bounding boxes
     this.handlers = [];	//array of objects -> { typeOfEvent, Fn }
 }
-ViewBox.prototype = theObjColl;
+var viewBoxProto = new ConstructorBuffer();
+viewBoxProto.__proto__ = theObjColl;
+ViewBox.prototype = viewBoxProto;
 ViewBox.prototype.constructor = ViewBox;
 ViewBox.prototype.WithParams = function(shape, width, height, xOffset, yOffset, scale) {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
     this.shape = shape;
     this.width = width;		//size of bounding box (before scaling)
     this.height = height;
     this.xOffset = xOffset;		//offset moves self and all descendants rel to parent
     this.yOffset = yOffset;
     this.scale = scale;		//scale applies to self and all descendants
-    this.parent = undefined;	//allows traversing upward through hierarchy
-    this.children = [];	//these are children view bounding boxes
-    this.handlers = [];	//array of objects -> { typeOfEvent, Fn }
-    return this;
+    return this; //so object returns from "constructor" call..
 }
 
 function GraphProperty() {
+    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
     this.propertyName = "";
     this.propertyValue = "";
     this.subProperties = [];
 }
-GraphProperty.prototype = theObjColl;
+var graphPropertyProto = new ConstructorBuffer();
+graphPropertyProto.__proto__ = theObjColl;
+GraphProperty.prototype = graphPropertyProto;
 GraphProperty.prototype.constructor = GraphProperty;
 GraphProperty.prototype.WithParams = function(propertyName, propertyValue) {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
     this.propertyName = propertyName;
     this.propertyValue = propertyValue;
-    this.subProperties = [];
     return this;
 }
 
@@ -174,13 +168,12 @@ function GraphPort() {
     this.properties = [];
     this.pairedPorts = [];
 }
-GraphPort.prototype = theObjColl;
+var graphPortProto = new ConstructorBuffer();
+graphPortProto.__proto__ = theObjColl;
+GraphPort.prototype = graphPortProto;
 GraphPort.prototype.constructor = GraphPort;
 GraphPort.prototype.WithElem = function(elem) {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
     this.element = elem;
-    this.properties = [];
-    this.pairedPorts = [];
     return this;
 }
 
