@@ -1,6 +1,6 @@
 //A syntax graph consists of two kinds of nodes: element, port, and property 
 //An element node can have sub-elements, and a property node can have
-// sub-properties, but a port node may not have sub-ports!
+// sub-properties, but a port node may not have sub-port
 
 //This uses require.js to create a module.  This module has the name of the
 // file (<currFileName>).  Inside the define, a number of data structures and 
@@ -52,130 +52,20 @@ var firstGabeTransformRule = {
     rootViewSet: {}
 };
 
-//Using inheritance via prototype, to keep a running hash of objects
-// indexed by their ID -- ID is auto generated as the objects are created
-function ObjColl(){
-    //start at 1 because 0 is interpreted same a null and other special ways
-    currID = 1;   //private, will create one ObjColl and use as prototype
-    objColl = [];
-    this.getNextID = function( obj ) {
-        objColl[currID] = obj; //objColl and currID are in the closure!
-        return currID++;
-    };
-    this.getByID = function( ID ) {
-        return objColl[ID];
-    }
-}
-var theObjColl = new ObjColl();
+//Get the class objects that define behavior for each of the structures that
+// appears in a POP syntax graph.. will use these as read in JSON of a graph
+// and parse it into objects of these classes!
+var graphClasses = require("./POPGraphClasses");
 
-//need all the classes to have common ObjColl instance, but each has
-// different constructor!  So, each needs its own prototype instance, so
-// need to create an empty object to act as the prototype instance, so can
-// add the constructor to that instance
-function ConstructorBuffer(){
-}
+var theObjColl = graphClasses.theObjColl;
 
-//create a "class" of graph elements..  make an elem via the "new" call..
-function GraphElem() {
-  this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-  this.properties = [];
-  this.portsIn = [];
-  this.portsOut = [];
-  this.linkedElems = [];
-  this.viewSet = undefined;
-};
-var graphElemProto = new ConstructorBuffer();
-graphElemProto.__proto__ = theObjColl;
-GraphElem.prototype = graphElemProto;
-GraphElem.prototype.constructor = GraphElem;
-
-function ViewSet() {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-    this.syntaxElem = {};   //back link to the corresponding syntax graph element
-    this.rootViewBox = [];
-    this.viewSetLinks = [];
-}
-var viewSetProto = new ConstructorBuffer();
-viewSetProto.__proto__ = theObjColl;
-ViewSet.prototype = viewSetProto;
-ViewSet.prototype.constructor = ViewSet;
-
-function ViewSetLink() {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-    this.referenceViewSet = {};
-    this.subordinateViewSet = {};
-    this.xOffset = 0;
-    this.yOffset = 0;
-    this.scale = 1.0;
-}
-var viewSetLinkProto = new ConstructorBuffer();
-viewSetLinkProto.__proto__ = theObjColl;
-ViewSetLink.prototype = viewSetLinkProto;
-ViewSetLink.prototype.constructor = ViewSetLink;
-
-//var a = new GraphElem();
-//var b = new ViewSet();
-//b.syntaxElem = 0;
-//var c = new ViewSetLink();
-//console.log("constructor test.. syntaxElem: " + c.getByID(1).syntaxElem);
-
-//the constructor for a ViewBox object
-function ViewBox() {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-    this.shape = undefined;
-    this.width = 0;		//size of bounding box (before scaling)
-    this.height = 0;
-    this.xOffset = 0;		//offset moves self and all descendants rel to parent
-    this.yOffset = 0;
-    this.scale = 1.0;		//scale applies to self and all descendants
-    this.parent = undefined;	//allows traversing upward through hierarchy
-    this.children = [];	//these are children view bounding boxes
-    this.handlers = [];	//array of objects -> { typeOfEvent, Fn }
-}
-var viewBoxProto = new ConstructorBuffer();
-viewBoxProto.__proto__ = theObjColl;
-ViewBox.prototype = viewBoxProto;
-ViewBox.prototype.constructor = ViewBox;
-ViewBox.prototype.WithParams = function(shape, width, height, xOffset, yOffset, scale) {
-    this.shape = shape;
-    this.width = width;		//size of bounding box (before scaling)
-    this.height = height;
-    this.xOffset = xOffset;		//offset moves self and all descendants rel to parent
-    this.yOffset = yOffset;
-    this.scale = scale;		//scale applies to self and all descendants
-    return this; //so object returns from "constructor" call..
-}
-
-function GraphProperty() {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-    this.propertyName = "";
-    this.propertyValue = "";
-    this.subProperties = [];
-}
-var graphPropertyProto = new ConstructorBuffer();
-graphPropertyProto.__proto__ = theObjColl;
-GraphProperty.prototype = graphPropertyProto;
-GraphProperty.prototype.constructor = GraphProperty;
-GraphProperty.prototype.WithParams = function(propertyName, propertyValue) {
-    this.propertyName = propertyName;
-    this.propertyValue = propertyValue;
-    return this;
-}
-
-function GraphPort() {
-    this.ID = this.getNextID(this); //this.getNextID promotes to prototype
-    this.element = {};
-    this.properties = [];
-    this.pairedPorts = [];
-}
-var graphPortProto = new ConstructorBuffer();
-graphPortProto.__proto__ = theObjColl;
-GraphPort.prototype = graphPortProto;
-GraphPort.prototype.constructor = GraphPort;
-GraphPort.prototype.WithElem = function(elem) {
-    this.element = elem;
-    return this;
-}
+//check this works
+var GraphElem      = graphClasses.GraphElem;
+var ViewSet        = graphClasses.ViewSet;
+var ViewSetLink    = graphClasses.ViewSetLink;
+var ViewBox        = graphClasses.ViewBox;
+var GraphProperty  = graphClasses.GraphProperty;
+var GraphPort      = graphClasses.GraphPort;
 
 
 //So, for now, set up for generating SVG..  this and the code below that
@@ -282,7 +172,7 @@ tempViewBox.scale = 1.0;
 tempViewBox.parent = undefined;
 tempViewBox.handlers.push({
     type: 'key',
-    fn: stdKeyHdlr
+    fn: graphClasses.stdKeyHdlr
 });
 
 //set this view box as the root of the view set
@@ -311,7 +201,7 @@ console.log("rootElem root view box ID: " + tempViewBox.ID );
 //add a handler for key down while over the shape for root elem
 tempViewBox.handlers.push({
 	type: 'key',
-	fn: stdKeyHdlr
+	fn: graphClasses.stdKeyHdlr
 });
 
 //save this view box to be the parent of the text's view boxes, which go inside it
@@ -337,7 +227,7 @@ var rect = gottenElem.getBoundingClientRect();
 //make a new view box object and populate it for the text box
 //The x of 8 and y of 8 are fixed positions for an element node!
 tempViewBox = new ViewBox().WithParams( text1_1_1_SVG, rect.width, rect.height, 8, 8, 1.0 );
-tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
+tempViewBox.handlers.push({ type: 'key', fn: graphClasses.stdKeyHdlr });
 
 //add view box into the tree
 tempViewBox.parent = tempParentViewBox;
@@ -349,7 +239,7 @@ var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
 //The x of 8 and y of 25 are fixed positions for this text in an element node!
 tempViewBox = new ViewBox().WithParams( text1_1_2_SVG, rect.width, rect.height, 8, 25, 1.0 );
-tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
+tempViewBox.handlers.push({ type: 'key', fn: graphClasses.stdKeyHdlr });
 
 //add view box into the tree
 tempViewBox.parent = tempParentViewBox;
@@ -361,7 +251,7 @@ var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
 //The x of 8 and y of 25 are fixed positions for this text in an element node!
 tempViewBox = new ViewBox().WithParams( text1_1_3_SVG, rect.width, rect.height, 8, 42, 1.0 );
-tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
+tempViewBox.handlers.push({ type: 'key', fn: graphClasses.stdKeyHdlr });
 
 //add view box into the tree
     tempViewBox.parent = tempParentViewBox;
@@ -373,7 +263,7 @@ var gottenElem = document.getElementById("svgText");
 var rect = gottenElem.getBoundingClientRect();
 //The x of 8 and y of 25 are fixed positions for this text in an element node!
 tempViewBox = new ViewBox().WithParams( text1_1_4_SVG, rect.width, rect.height, 8, 59, 1.0 );
-tempViewBox.handlers.push({ type: 'key', fn: stdKeyHdlr });
+tempViewBox.handlers.push({ type: 'key', fn: graphClasses.stdKeyHdlr });
 
 //add view box into the tree
 tempViewBox.parent = tempParentViewBox;
@@ -539,42 +429,6 @@ tempElem.portsOut[0].properties[0].subProperties[0] = new GraphProperty().WithPa
 tempElem.portsOut[1] = new GraphPort().WithElem( tempElem );
 tempElem.portsOut[1].properties[0] = new GraphProperty().WithParams("TypeOfPort", "dataComm");
 tempElem.portsOut[1].properties[0].subProperties[0] = new GraphProperty().WithParams("TypeOfCommData", "float");
-
-//no paired ports in this one..  done done!!
-
-//dump the graph out to JSON file
-//var foo = JSON.stringify(firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0].portsOut[1].properties, null, '\t');
-//console.log("stringified JSON: " + foo );
-//var object = JSON.parse( foo );
-//console.log("parsed back from JSON: " + object[0].propertyName );
-
-//print a few things, just to make sure the data structs are correctly
-// created and can be traversed.
-//var passThroughCmd = firstGabeTransformRule.rootElem.linkedElems[1].linkedElems[0];
-//fillText = passThroughCmd.portsOut[1].properties[0].subProperties[0].propertyValue;
-//console.log("propertyValue: " + fillText);
-
-
-function stdKeyHdlr(e) {
-	console.log("bb event: " + e.type + " on: " + e.target.ID);
-}
-
-//function makeNewViewBox(shape, width, height, x, y, scale){
-//	var tempViewBox = {
-//		ID: undefined,
-//		shape: shape,
-//		width: width,	//size of bounding box (before scaling)
-//		height: height,
-//		xOffset: x,		//offset moves self and all descendants rel to parent
-//		yOffset: y,
-//		scale: scale,	//scale applies to self and all descendants
-//		parent: undefined,	//allows traversing upward through hierarchy
-//		children: [],	//these are children view bounding boxes
-//		handlers: []	//array of objects -> { typeOfEvent, Fn }
-//	};
-//    tempViewBox.ID = firstGabeTransformRule.getNextID(tempViewBox);
-//	return tempViewBox;
-//}
 
 function makeSVGTextStr(textContent) {
 	return '<svg>  <text x="0" y="9" style="font-family: Arial; font-size: 11;fill:black;stroke:none" id="svgText">' + textContent + '</text> </svg>';

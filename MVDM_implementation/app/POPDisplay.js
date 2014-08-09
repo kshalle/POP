@@ -49,7 +49,7 @@ var handleGesture = function( event ) {
 function acceptRootViewSet (rootViewSet) {
 	//Here, convert each view hierarchy element into an equivalent
 	// famous render tree node
-	
+return;
 	//during testing, log some known positions within the hierarchy
 	console.log("POPDisplay: root view set: " + rootViewSet.ID);
 
@@ -86,7 +86,7 @@ function acceptRootViewSet (rootViewSet) {
 	var viewBox = {}; var newSurface = {}; var newSurfMod = {};
 	var newContainer = {}; var newContMod = {}; 
 	var i = 0; var numChildren = 0; 
-rewrite display to handle view sets!
+//rewrite display to handle view sets!
 	var nextGenParents = []; var parentContainer = {}; var viewBoxChildren = [];
 	nextGenParents.push( {viewBox: rootViewSet, container: rootContainer});
 	//loop, getting oldest parent pair in queue each time
