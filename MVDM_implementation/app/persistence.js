@@ -501,7 +501,7 @@ var graphClasses = require("./POPGraphClasses");
         // then fill it back up again as parse the objects in..
         graphClasses.theObjColl = new graphClasses.ObjColl(); //make empty one
 
-        console.log( "Retrieved: " + theJSONString );
+//        console.log( "Retrieved: " + theJSONString );
 
         //split the string into separate JSON object-strings
         var objJSONArray = theJSONString.split(/separator\n/);

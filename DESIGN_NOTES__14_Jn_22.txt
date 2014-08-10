@@ -206,42 +206,50 @@ Then, find the next element to visit..  do that by:
 -] when all reachable neighbors of elem done, restore position saved before visiting elem.  If none, then are done.
 
 ==
-Now, have view boxes attached to the elements (there is a tree of viewboxes for each element, which includes boxes for the ports and any visual cues caused by properties or derived from properties)
+Now, have view boxes attached to the elements (there is a tree of viewboxes for each element, which includes boxes for the ports ((which only provide scaling and translation of the sub-graph that appears inside the port)) and any visual cues caused by properties or derived from properties)
 
 disconnect the ones for this elem from the ones for other elems..  so a given box can only be reached from exactly one elem!
 
-Soooo..  what need is to have two separate kinds of hierarchy..  there is hierarchy for a single element node, which includes all of the things that are visualized for that element, including boxes for empty ports, and indicators of the boundary around what should be drawn inside the POSITION of a given port.  Call that an element-set.
+Soooo..  what need is to have two separate kinds of hierarchy..  there is hierarchy for a single element node, which includes all of the things that are visualized for that element, including boxes for empty ports, and indicators of the boundary around what should be drawn inside the POSITION of a given port.  Call that an view-set.
 
-Then there is hierarchy between different element-sets..  for example, which other element goes inside a given port's boundary box.. this is what applies parental shift and scale transforms.
+Then there is hierarchy between different view-sets..  for example, which other element goes inside a given port's boundary box.. this is what applies parental shift and scale transforms.
    So there are some cases here..  element inside port of another element, and element that is a linked element of another.  Also case of ordered children of a common parent.
-   For example, in the Gabe Transform rule, there is a big blue arrow drawn between the query pattern sub-graph and the resultant pattern sub-graph..  the tail goes to the parent's first child, the tip to the second child, and the two children are arranged side-by-side inside of the bounding box of the parent..  where the parent has no shape, just a positioning of children rule and the blue arrow between children
+   For example, in the Gabe Transform rule, the top level element is a hierarchy element.  It has a big blue arrow drawn between the query pattern sub-graph and the resultant pattern sub-graph..  the tail goes to the parent's first child, the tip to the second child, and the two children are arranged side-by-side inside of the bounding box of the parent..  where the parent has no shape to represent it directly, but rather a positioning of children rule and the blue arrow between children.
+   Hence, that top level element has, as it's view set, a view box that has the blue arrow as its shape, and has two transforms, one to be applied to each child that puts the child in place and scales it.
    
-So, it is up to the parent to decide position of each child hierarchy..  has to know the contents of the child hierarchies in order to calc the size of bounding box..  but, will deal with sizing later..  rely upon user interaction to get the sizing right..  do sizing as graph grows, one bit at a time..  for now, the parent has a translation and scale to apply to the child, while the child has its own declared size..  so, that is element-set to element-set
+So, it is up to the parent to decide position of each child hierarchy..  has to know the contents of the child hierarchies in order to calc the size of bounding box..  but, will deal with sizing later..  rely upon user interaction to get the sizing right..  do sizing as graph grows, one bit at a time..  for now, the parent has a translation and scale to apply to the child, while the child has its own declared size..  so, that is view-set to view-set
 
-So, each element set has rules about how to arrange things inside the set..  and another set of rules about how to arrange children or neighbor sets!
+So, each view-set has rules about how to arrange things inside the set..  and another set of rules about how to arrange children or neighbor sets!
 
 So, the visualizer is the thing that knows the rules and calculates placement and size (scale)..  this results in artefacts: links between boxes and links between sets, and info on translate and scale!
 
 so within a set there is no scaling.
 
-between sets, either can state itself as reference for the pair, and then state a translation and scaling for the other.  It is an error for two directly linked to both state themselves the reference for the other.  However, a given set act as both a reference and a recipient, across different sets that are paired to it.
+between sets, either of them can state itself as reference for the pair, and then state a translation and scaling for the other.  It is an error for two directly linked to both state themselves the reference for the other.  However, a given set can act in one case as a reference and in another as a recipient, across different sets that are paired to it.
 
-So, it is the link from one element set to another where the reference designation lies along with the translation and scaling of the recipient
+So, it is the link from one view-set to another where the reference designation lies, along with the translation and scaling of the recipient
 
 Hmmmmmm..  means that a link between two viewbox-sets is a full object rather than just a pointer!
 
-Hmmmmmm..  want to specialize to the point that encode this distinction about element set versus simple viewbox?  What about making it a view-set box..  leaving out any notion of element?  Then it just says that view boxes can be grouped into sets that are treated as a single whole, as far as translation and scaling are concerned..
+Hmmmmmm..  want to specialize to the point that encode this distinction about view-set versus simple viewbox?  What about making it a view-set box..  leaving out any notion of element?  Then it just says that view boxes can be grouped into sets that are treated as a single whole, as far as translation and scaling are concerned..
 
 Then, it is the visualizer that recognizes what gets put together as a view-set, and calculates the translations and scalings that one view-set imposes on another view-set..
 
 Take an example: Summation symbol..  the body is a separate view-set, but the summation view-set determines the scaling and position of the body set.  
+
+   There needs to be some connection, from the transform that places the child, to the root view box of that child.  The child has its own root element, and that element has its own view set.  So, that view set should be attached as the contents of the child-position in the parent -- the root view box of the view set should be attached to the end of the chain of child's transforms in the parent.
+   Do this connection inside the link object that links two view-sets.  The link states which is the parent, and it states a translation and scaling to be applied to the child view set.  The translation and scaling is relative to the parent's origin (which can, in turn be a child for some other view set, such that it was translated and scaled, and so on..)
 
 ====================
 Implementation:
 -] create a view-set object
 -] two kinds of links in the view hierarchy.. 
 - -] the view set acts as root/head to its contained viewboxes, which form a tree.
-- -] the view set has array of objects that act as links to other view sets.  The link objects are shared by both view-sets, and back-link to the view sets.  The link objects form the glue.. a view-set determines the relative positions and sizes of other view sets via the link objects.  each view set knows only about the link objects it is connected to, 
- 
+- -] the view set has array of objects that act as links to other view sets.  The link objects are shared by both view-sets, and back-link to the view sets.  
+
+Hence, a view-set determines the relative positions and sizes of other view sets via the link objects.  each view set knows only about the link objects it is connected to.
+
+-] view set link object has two pointers in it, one to the parent view-set and one to the child view-set.  A link object contains an offset and a scale, that are relative to the parent view-set's root viewbox, and are applied to the child view-set's whole view tree.
+
 
 

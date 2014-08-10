@@ -45,11 +45,50 @@ var handleGesture = function( event ) {
 // a render tree out of the incoming view set.
 //BUG: need a way to limit the view sets that this crawls to, other wise it
 // will just find all the other view sets via the view set links and render
-// the entire graph!
+// the entire graph!  -- add a "boundary" to the link objects.
+//
+//A view set is linked to other view sets.  Each link marks which is the parent
+// and which is the child, and also carries an offset and scale, that are
+// relative to the parent's root view box and are applied to the child's
+// entire view tree.
+//
+//Do this: make a container for each view-set link.  The child view tree is
+// added to that container.  Make two modifiers, one for the offset, the other
+// for the scale, and add that chain to the parent container, then add the
+// child container to the end of that chain:
+// parentContainer.add(linksTranslateMod).add(linksScaleMod).add(childContainer)
+//
+//Separately add the view tree contents of parent to parent container
+// and add contents of child view tree to child container..
+//
+//So, starting with root view set, assume that it is the top level view set,
+// and so not the child of any others (not always true!  Fix later).
+// Assume the view-set graph is well formed, so a given view set is
+// the child of at most one other view set.
+// Make the root view set the "current view set"..  make a var that is the
+// "end of current parent chain".  Set this var to be the main context.
+//Start recursion..  this fn processes one view-set
+// Mark the current (passed in as parameter) view set as "visited this round"
+// Make a container, and add this container to the end of the parent chain
+// (which was also passed in as a parameter).
+//Add the root view box and its descendants to this container.
+//Get view set's array of links.  For each view set link:
+// check whether it's marked "do not pass" or the other side is marked
+// "already visited this view set this round".
+// if neither, then see whether the current view set is child or parent
+// if parent, then create a modifier with the x and y offsets and a modifier
+// with the scaling, all of which are stated in the link.  Add those modifiers
+// to the current view set's container.  Then recursively call, with the last
+// modifier as the "end of current parent chain" parameter and the child
+// view set as the other parameter.  When return, go to next link.
+// if child, then make the modifiers and add own container to end, then call
+// a second recursive fn, which is nearly the same, except assumes enter it
+// from a child, rather than enter it from a parent.  Place the first of
+// the modifiers in the parameter position of "start of child mod chain" and
+// the parent view set as the other parameter..
 function acceptRootViewSet (rootViewSet) {
-	//Here, convert each view hierarchy element into an equivalent
-	// famous render tree node
-return;
+	//Here, convert view hierarchy into an equivalent famous render tree
+
 	//during testing, log some known positions within the hierarchy
 	console.log("POPDisplay: root view set: " + rootViewSet.ID);
 
@@ -60,7 +99,7 @@ return;
 	var rootContainer = new ContainerSurface({
 		//For now, fixed root size.. later, will set according to window
 		// being displayed within..
-		size: [rootViewSet.width, rootViewSet.height],
+		size: [rootViewSet.rootViewBox.width, rootViewSet.rootViewBox.height],
 		properties: {
 			overflow: 'hidden'
 		}
@@ -88,9 +127,13 @@ return;
 	var i = 0; var numChildren = 0; 
 //rewrite display to handle view sets!
 	var nextGenParents = []; var parentContainer = {}; var viewBoxChildren = [];
-	nextGenParents.push( {viewBox: rootViewSet, container: rootContainer});
+//	nextGenParents.push( {viewBox: rootViewSet, container: rootContainer});
+	nextGenParents.push( rootViewSet );
 	//loop, getting oldest parent pair in queue each time
 	while( (parentPair = nextGenParents.shift()) != undefined ) {
+        if( parentPair.type == "ViewSet" ) { parent
+            //have a view set instead of a view box plus container
+        }
 		parentContainer = parentPair.container;
 		viewBoxChildren = parentPair.viewBox.children;
 		numChildren = viewBoxChildren.length; 

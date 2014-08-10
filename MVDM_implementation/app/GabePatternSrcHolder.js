@@ -16,8 +16,8 @@ var persistence = require('./persistence');
 //console.log("\npersisting graph done!\n")
 
 //wait until all the writes complete before retrieving!
-syntaxGraph = persistence.retrieveTheGraph();
-console.log("\nretrieving graph done!\n")
+//syntaxGraph = persistence.retrieveTheGraph();
+//console.log("\nretrieving graph done!\n")
 
 return{
 	visualizer:  visualizer,
