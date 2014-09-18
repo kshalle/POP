@@ -147,10 +147,10 @@ var renderWindow = function( window ){
 	//Note: this plumbing may change.. don't really want the visualizer
 	// to have to calculate the position and scaling of each root view set
 	//Render the root view set -- position and scale are inside transforms
-	child = window.children[0];
+	var child = window.children[0];
 	renderRootViewSet( child.rootViewSet, child.transforms );
 		//now done with 
-    child.rootViewSet.advanceTagsToNextRound();//marks all boxes as unvisited
+	child.rootViewSet.advanceTagsToNextRound();//marks all boxes as unvisited
 }
 
 
@@ -219,8 +219,10 @@ function renderRootViewSet (rootViewSet, transforms) {
 	//-] Call the recursive function that walks the view-set graph, visiting 
 	//   the connected view-sets.
 	var rootContainer = new POPContainer();
-	rootContainer.width = rootViewSet.width * transforms.scaleFactor;
-	rootContainer.height = rootViewSet.height * transforms.scaleFactor;
+	rootContainer.width = 
+			rootViewSet.boundingBoxWidth * transforms.scaleFactor;
+	rootContainer.height = 
+			rootViewSet.boundingBoxHeight * transforms.scaleFactor;
 	rootContainer.realX = transforms.realX;
 	rootContainer.realY = transforms.realY;
 	rootContainer.imposedScaleFactor = transforms.scaleFactor;
@@ -401,7 +403,7 @@ function renderTheViewTreeOfViewSet( viewSet ) {
 			//make container for the view box
 			var boxContainer = new POPContainer();
 			var totalScaleFactor = parentContainer.imposedScaleFactor *
-								   viewBoxToProcess.localScaleFactor;
+								   viewBoxToProcess.scaleFactor;
 			boxContainer.width = viewBoxToProcess.width * totalScaleFactor;
 			boxContainer.height = viewBoxToProcess.height * totalScaleFactor;
 			boxContainer.realX = parentContainer.realX + 
@@ -412,7 +414,7 @@ function renderTheViewTreeOfViewSet( viewSet ) {
 					parentContainer.imposedScaleFactor;
 			boxContainer.imposedScaleFactor = 
 					parentContainer.imposedScaleFactor *
-					viewBoxToProcess.localScaleFactor;
+					viewBoxToProcess.scaleFactor;
 
 			viewBoxToProcess.container = boxContainer;
 			
@@ -453,7 +455,7 @@ function renderShapeOfViewBox( viewBox ) {
 	var shapeY =	viewBox.yOffset * container.imposedScaleFactor +
 					container.realY;
 	var scaleFactor =	container.imposedScaleFactor * 
-						viewBox.localScaleFactor;
+						viewBox.scaleFactor;
 	newSVGElem = new SVGElem(	shape, shapeX, shapeY, 
 								scaleFactor, viewBox );
 }
