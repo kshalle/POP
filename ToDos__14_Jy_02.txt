@@ -106,16 +106,18 @@ Will need different view annotations for each place the function is used..  so, 
 
 //==
 
-Okay, what about this..  place annotations, by hand, onto the syntax graph objects..  those state placement relative to each other, and state visual hierarchy, and state scale relative to each other..  then, the current view is like a projection onto the graph, that selects which elements are within the view, and sets a global zoom.
+# Okay, what about this..  place annotations, by hand, onto the syntax graph objects..  those state placement relative to each other, and state visual hierarchy, and state scale relative to each other..  then, the current view is like a projection onto the graph, that selects which elements are within the view, and sets a global zoom.
+[-] Done and working
 
-You know, pretty much want to build the view hierarchy as part of the syntax graph..  will need visual hierarchy, including bounding boxes, in order to calculate what is (potentially) visible to the camera, and when go to 3D, will need hierarchy in order to know things like what to represent as a single box, versus to break open and show the innards..  and hierarchy will decide relative scale to each other -- siblings at same scale as each other, and parents at larger scale than children, and once scaled small enough, stop showing children, which are the innards, instead just show the parent as a box.  Also will want hierarchy during projection from 3D onto the camera's view..  hierarchy will affect placement within 3rd dimension..
+# You know, pretty much want to build the view hierarchy as part of the syntax graph..  will need visual hierarchy, including bounding boxes, in order to calculate what is (potentially) visible to the camera, and when go to 3D, will need hierarchy in order to know things like what to represent as a single box, versus to break open and show the innards..  and hierarchy will decide relative scale to each other -- siblings at same scale as each other, and parents at larger scale than children, and once scaled small enough, stop showing children, which are the innards, instead just show the parent as a box.  Also will want hierarchy during projection from 3D onto the camera's view..  hierarchy will affect placement within 3rd dimension..
+[-] Done and working
 
-Will, at some point, want topological visualization, which represents translations between worlds..  represents the twist-upon-itself topology of many types of thought..  the thing where, when think about some system, there are relationships among things such that part of thought moves within one "system" or one "universe" and then a transition happens to a different system/universe after which have relationships within that one, then switch again..
+******           ***********     ***********    ********
+*Will, at some point, want topological visualization, which represents translations between worlds..  represents the twist-upon-itself topology of many types of thought..  the thing where, when think about some system, there are relationships among things such that part of thought moves within one "system" or one "universe" and then a transition happens to a different system/universe after which have relationships within that one, then switch again..
+******           ***********     ***********    ********
 
 =========================================================
-==
-==
-==
+== Attach view hierarchy to syntax graph
 ==========================================================
 
 #-] attach the view hierarchy to the syntax graph itself
@@ -123,30 +125,80 @@ Will, at some point, want topological visualization, which represents translatio
 
 XXX -] Be able to generate view hierarchy code from just data, calculated.
 
--] Make Persister and Restorer, which write the syntax graph out to file as JSON and read it back in.  (see design notes for algorithm)
+#-] Make Persister and Restorer, which write the syntax graph out to file as JSON and read it back in.  (see design notes for algorithm)
 
--] make the Visualizer attach a handler fn to each bounding box
-- -] test that the smallest bounding box is what receives the event 
-- -] place parent links into each bounding box in the view hierarchy
+======================
+= Event Handlers
+======================
+# -] attach a handler fn to each bounding box
+# - -] test that the smallest bounding box is what receives the event 
+# - -] place parent links into each bounding box in the view hierarchy
+XXX == Try invisible box over the top of text
+#== try handler fn loaded onto the html page and spec handler name in the svg
+== search for others experiences with famous event handling with svg
+#== post a bug to famous..?
+#== try writing the svg directly to DOM, see if events work in that case (ie, rather than that famous is messing it up)
 
--] make the Display register a Famous event on each surface that corresponds to a bounding box
-- -] make the Display put a back-link in each surface that points to the view hierarchy bounding box that the surface corresponds to
-- -] when register the event, register the generic Display event-handler
+#-] make the Display register a Famous event on each surface that corresponds to a bounding box
+#- -] make the Display put a back-link in each surface that points to the view hierarchy bounding box that the surface corresponds to
+#- -] it receives the event object
+#- -] it takes the surface out of the event object
+#- -] it uses the back-link in the surface to get the view hierarchy object
+
+#-] make a handler for key presses.
+#- -] the handler receives the event object, 
+XXX - -] plus the smallest enclosing bounding box.
+
+# == try keydown on whole document, plus mouse over, mouse exit, to track which surfaces "receive" the key
+
+XXX -] Get it so that keydown is detected on individual surfaces, and the event object holds the particular surface..  as well as x and y relative to window
+
+# -] See if can attach an event handler directly in an SVG string, which names the generic Display handler.
+[-] Can attach mouseover and mouseout hdlrs, but not a keydown handler
+#- -] set the innerHTML of a DOM element to be the SVG string.
+#- -] put the generic Display handler as a script in the HTML of the seed page
+
+[-] keydown and keypress don't work on most innerHTML, and don't work on Famous surfaces that have SVG text inside them.
 
 -] make a generic-event-handler, which is part of the Display code
-- -] it receives the event object
-- -] it takes the surface out of the event object
-- -] it uses the back-link in the surface to get the view hierarchy object
-- -] it calls the handler function attached to the view hierarchy object
+- -] it calls the handler function that is attached to the view hierarchy object..  hence, handling function is specific to particular view box instance!
+- -] when register an event handler on a famous surface, register the generic Display event-handler
+- -] make the holder supplied event handler internally dispatch on the type of event!  hence, all view boxes have zero or one event handler.
+- -] The generic handler only gets the famous surface (or DOM element) out of the event object, then gets the view box from that, then invokes the one-and-only handler that's in the view box, giving it the event object, upon which the handler dispatches and does view-box specific behavior according to event type.
 
--] make a handler for key presses.
-- -] the handler receive the event object, plus the smallest enclosing bounding box.
+-] Try approach of directly populating the DOM
+#- -] see what happens when attach object.style.transfrom="trans-fn"
+XXX- -] use object.style.transfrom="trans-fn" for shift and scale transforms
+[=] Erratic..  not reliable..
+
+[=] SVG directly inserted into DOM works!  After much experimentation
+-] Populate DOM with SVG 
+- -] put one root SVG in the HTML page
+- -] create new SVG elements, add SVG string as their innerHTML, add as children of the root SVG
+[=] adding shift transform to SVG elem doesn't work, but setting it's x and y does!
+- -] accumulate offsets from ancestors, to arrive at exact x and y of each SVG shape, relative to the root SVG's origin.  Also accumulate the scalings.
+#- - -] take a few minutes to look inside Famous code to see what they do
+[=] got nothing from the code..
+- - -] keep a chain of all ancestor transforms -- each view-set-link to a parent, going up to the root, has a shift + scale transform on it.  That represents the shift applied to the root container and the scale applied, in order to place that entire view set at the x and y within the root svg, and arrive at its scale (which is applied to the view set's container's size).  Keep the product of those transforms as travel around the view-set graph.  For each view-set, have one composite transform that applies to all elements of that view set! 
+- - -] As render a given viewset, make a container for each view box that has children, and make an SVG element for each rendered shape.  Calculate the composite transform, given that of the container and the offset and scale of the child within that container.  Each viewbox has its own shift and scale transform, which is relative to its parent viewbox (or view set container, for the root viewbox).  
+- -] Insert a back pointer into each DOM element that points to its view box
+- -] make generic event handler obtain the DOM element from the event object, and from there obtain the pointer back to the view box, and from there invoke the event handler that was attached to the view box by the visualizer, and has behavior specific to the view-box.
+
+-] Try approach: 
+- -] put mouseenter and mouseexit (mouseover and mouseout) handlers on all the famous surfaces.  
+- -] Track order of triggering -- mouseover adds to end of list, mouseout removes from list.  Only issue is when have a ring around another surface.  
+- -] Only use shift and scale modifiers (to reduce chance of Famous transform bug).  
+- -] Separately add a keydown handler to the DOM document as a whole.  When keydown detected, then key is inside of all in list.  Directly inside end of list.  Keep a head pointer and a tail pointer.  Doubly
+
+-] make menu pop up in response to keydown
+- -] do canned menu contents, for now.
+- -] make menu contents include keys to press and include a handler that dispatches on the particular key.
+- - -] Some mechanism in the handler will have to recognize when a click is performed instead of a key press, and performed outside the menu boundary, and so cause the menu to go away.
+
+-] when particular kind of event happens, calculate the mid point in the side of the nearest shape of the appropriate type.  For example, when adding an arrow, hit a particular key when the mouse is near to the side of a drawn port node.  First find that near port node, then second calculate the mid point of its nearest side, third create an SVG bezier element from the side mid point to the mouse position.
 
 -] make the gesture-handler turn the event plus bounding box into a command.
 
-For example, if previously a gesture caused the start of the mode for typing text into a field -- say for entering the name of a variable -- then the gesture handler looks that up, within state enclosed with the gesture handler but shareable among different handlers.  The code then branches to where it extracts the key value from the event object.  It reuses a "key into field" command object, and packs it with data.  The data includes the model-object that is attached to the appropriate bounding box (the handler does the work of figuring out which bounding box corresponds to the syntax graph object that owns the field that is being typed into).  So, each bounding box has a back-link to the Model object that the shape inside the bounding box represents, where appropriate (IE, the bounding box for text has no back-link, but the bounding box for the element-box shape does have a back-link to the element object!)  Might make it just "useful info" -- for example, a text bounding box might include the name of the field of the object that the larger enclosing bounding box back-links to.  The gesture-handler will also extract any needed info from the event object, such as which key was pressed, and add that to the command-object.
-
-The command is then sent to the Modifier, which changes the back-linked-to syntax graph objects.  As part of that, it also modifies the visualized-sub-graph, and notifies the visualizer to update.
 
 ==============================================================
 =

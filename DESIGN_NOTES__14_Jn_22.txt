@@ -252,4 +252,185 @@ Hence, a view-set determines the relative positions and sizes of other view sets
 -] view set link object has two pointers in it, one to the parent view-set and one to the child view-set.  A link object contains an offset and a scale, that are relative to the parent view-set's root viewbox, and are applied to the child view-set's whole view tree.
 
 
+//==============================================================
+//==
+//==   Menu, Commands, Interaction -- assigning responsibilities
+//==
+//==============================================================
 
+-] Something has to generate the contents of a menu -- that is specific to the commands that are valid, and relies upon a context.
+
+-] Something has to receive the gesture that triggers display of the menu and then draw the menu, and populate it with a handler or handlers for the items in the menu, so that a custom function runs for a particular item chosen
+
+
+-] Q: what about shipping event handler together with view boxes?  And maybe shipping a menu function?  So individual boxes set the fill of the menu, while menu function does plumbing..  the Display expects a menu function that it can call to get menu contents..  Q: make key-based handling standard across different kinds of holders?  It seems src specific..
+Maaaybe not..  any contents viewer will need to interact with the user..  the visualizer is specifically for human visual representation.  So a human will interact.  Sooooo, a menu system will be needed no matter what..  sooooo, the menu contents are provided by the holder, and rendered in menu format by the Display..
+
+
+//==============================================================
+//==
+//==   Commander -- turning gesture into command
+//==
+//==============================================================
+
+
+Example:
+-] Previously a gesture caused the start of the mode for typing text into a field, say for entering the name of a variable
+-] The gesture handler receives a new gesture event 
+- -] the gesture handler looks up the current "mode", within state shareable among the event handlers.  
+- -] The code then branches to where it extracts the value of the key pressed, from the event object.  
+- -] When the mode started, a "collector" object was created that collects the key strokes -- when done, the user will give a gesture that causes the collection to be treated as a unit that is placed into a command that then goes to the modifier.  
+- -] the collector object also has a link to the syntax graph object that is related to the text being typed in (cases: 1. an existing object is being modified, so that is the object linked to in the collector object; 2. a new element will be inserted, so the insertion point is linked to in the collector object; 3. ?).
+- -] Idea: the related object is found as follows: 1. the event contains the Famous surface that the event happened on, get that.  2. the surface contains a back link to the view box it corresponds to, get that.  3. (one possibility) climb the view box tree until reach the view set, get that. (second possibility) the view box has a back link to the syntax-graph node it corresponds to, plus the name of the field within that node object 4. the view set back links to the syntax element, get that OR have the back link directly from the view box.  Now have the syntax element related to the gesture, OR the syntax node object related to the gesture.
+- - -] Not exactly clear how linking from view boxes back to graph nodes works best..  might link individual view boxes back to, say, property nodes or port nodes if that proves to make things easier.  
+- -] The gesture-handler extracts any needed info from the event object, such as which key was pressed, and adds that to the collector-object.
+- -] The gesture-handler invokes the commander, passing along the gesture information and the syntax node related to it.
+
+Thinking that things like moving edit-point (aka insertion point) and popping up the menu and navigation through the menus are all done by holder-specific event handlers.  The holder sends handlers to the Display, for example, packaged with the view boxes.  Those perform things that don't directly modify the syntax graph.  Only once enough gestures have been captured that a full sentence specifying a modification of the graph is ready, then does a command get packaged up and sent to the modifier.
+
+So, the commander is the collection of event handlers that are attached to the view boxes!  
+
+There will be common functions, so the view box handlers will be decorations that pass along to the core commander functionality.
+
+Soooo..  how to decide which options are available in the menu?  They will depend upon the point in the graph where the edit point lies, or upon what has been selected, or upon which view box has received the event, and upon the current mode..  for example, can be laying down a connection between elements, or can be putting something into a port-box, or inserting a new element at a point in the graph.
+
+Hmmm, thinking to make it easy, for now, all new elements are simply put down, with no connections, then wire it up.  Later, will add checks, that look at the types of ports and give a visual indication, direct from event handler, when two ports that are being wired are incompatible..  likewise, when displaying ports as boxes and subgraphs have an implied bounding box around them that is the output port of that subgraph, it won't let a subgraph be inserted into a port if the subgraph's output is incompatible.  These checks will all come from the holder, in the form of handlers given to the Display.  Might need to have some kind of round trip thing..  where event handlers send a command to the Modifier, which performs the check and sends a response back..  what's allowed will depend upon the details inside the graph..
+
+But for now, just want the functionality of being able to build a graph!  Architect the code to be compatible with adding checks, probably inside the event handler, so that menus get populated according to the syntax graph details, and attempts to modify the graph are denied during the attempt, based upon details of the graph..  hmmm, guess that means need something inside the holder in addition to the modifier.. need an action checker, or referee, or rule judge, whatever call it..  kinda like referee, decides which actions are within the rules..  yeah, so make event handlers such that they can send attempted action to the referee, which is back in the holder, and get a response, then either allow the action or disallow with a message sent back by the referee.
+
+Good.  I like that.. 
+
+So here's where we're at:
+-] Generic Display defined event handler
+- -] It knows or figures out which view box (in a manner that depends upon the technology used to paint)
+- -] from the view box gets the holder-specific event handler attached to the box.
+- -] it calls the holder specific event handler in the view box
+-] The view box's event handler is specific to the kind of visual thing -- a variable name, or an element shape, or a port box.
+-] the view box's event handler figures out the action, based upon the type of event and the contents (IE, click vs drag vs keydown + particular key combo)
+-] For certain kinds of actions, the view-box handler can make a call to the src holder's referee to see if the action is allowed
+-] For menu actions, the view-box handler can make a call to the src holders referee to ask for valid contents to place into the menu
+- -] the context of the event is sent to the referee or is available to the referee, such as which graph node is under the cursor, or which mode was previously chosen, or what nodes are currently selected.
+-] The menu painting is implemented by the Display.  The contents and the handler triggered by each is supplied by the referee, and is relayed by the view box handler that receives the start-menu event, or relayed by the menu-handler that receives the select-this-in-menu (a keydown or a click) event.
+
+Yes.  That covers populating the menu, based upon what is under the mouse and which key is pressed, and it covers checking the validity of attempted actions, and it covers advancing through the menu, and it covers making some parts be fixed things of the Display, while others are custom things of the src holder.  Yes, all covered  :-)
+
+So, the outcome of the view box event handler is either a modification of context (such as zoom, pan, selected portions of graph, change edit mode), or it is a command indicating a change to the syntax graph (such as wire two ports together, or add new element, delete element or wiring, add property, and so on)
+-] A command indicates a particular node or nodes in the syntax graph to be modified, and the modification to be made.  Or else indicates the addition of a new node or nodes, such as addition of a new element of a particular command type.  
+- -] Most of the information in the command is taken from or generated by the code sent by the referee, which was the code of the menu handler, which was sent as the contents of a requested menu.  IE, user has a menu up, hits the key for a particular choice in the menu, that key is associated to a particular handler function that was sent by the referee, that handler function knows how to populate a command for creating a new Summation element.
+
+-] The command is then sent to the Modifier, by the view box event handler or by the menu event handler. 
+-] the modifier modifies the syntax graph objects that are indicated in the command.  
+-] The modifier notifies the visualizer about the nodes that have changed.
+-] The visualizer modifies the view sets of the affected elements, 
+-] The visualizer then sends a notice to the display regarding the view set changes.
+- -] Not clear on this part just yet..  does the visualizer send notice of which were deleted, which had contents changed, and which added?  Or does it just send the boundaries of a sub-graph that should be painted?  In order to send boundaries, those boundaries will have to be in-sync with pan and zoom, which are handled..  where?  Directly in the event handler, all inside the display?  Or, do pan and zoom make it back into the view set graph?  They modify the "do not cross" markers inside view set links!  Hence, the modifier must be the one to change those, hence pan and zoom generate commands.  Sooooo..  it seems just fine to have the visualizer just cause the entire current visualized sub-graph be redrawn.. it just tells the Display to redraw!  As simple as that.  It should, for example, be sure to block off any view sets that will be too small to be visualized, maybe adding a "too small" marker in the view-links, letting the Display choose an appropriate symbol, such as a small box or something..
+
+-] Okay, looking like modifier updates the do-not-cross markers in the view-set graph and modifies which element is the root of the view.  The visualizer makes changes to the view boxes that correspond to the changed graph nodes.  Then the visualizer tells display to redraw the whole visible sub-graph, starting from the root!
+
+Done.  That will all work.
+
+Last thing is just calculating the curves that connect elements!  Haven't gotten to this yet..  in the graph form, have the arrows going between nodes..  in the Hamiltonian Path form, will have arrows that represent scopes triggering processor creation..  these arrows are not one-to-one with things in the view graphs!  Rather, they are implied by one node having a pointer to another node -- the existence of that pointer causes an arrow to be drawn from node that holds the pointer to the node pointed to.
+
+Have to calculate the positions on the shapes where the arrow originates and where it ends.
+
+have to add something to the view set that equates to the arrows, which has the data for the end points and the data for the control points that determine the arrow shape.
+
+Let's see..  can have arrows inside a single element's view set..  in this graph view, each of the property boxes is visible and they are linked via arrows to the element node and the port nodes.
+
+Hmmmm..  have to work this out next, as the next step in visualizing a graph..
+
+Now, just need the stupid event handling to work like it's supposed to!
+- - thinking abandon Famous.  Just post elements directly to the DOM.  Means have to calculate the shifts and scales myself..  see if can lift code from Famous for that..  All I need is the thing where build a tree of parents that have shift and scale in the link to children, and accumulate the shift + scale of ancestors.  Once the shift + scale chain has been applied, just add the result as a shape with the given size and position directly to the root of the DOM.
+
+The problem may be that famous doesn't play well with SVG things, so have to attach the event handlers directly in the SVG string, which means have to post the generic Display handler in the HTML of the seed page, so that it can be named in the string that is inserted as "innerHTML" in the elements.  See whether can add a back pointer to an element and retrieve that from the event object, inside the generic handler..
+
+//==============================================================
+//==
+//==   Visualizer -- generating view set graph
+//==
+//==============================================================
+
+So, the way seeing view sets and view boxes and custom syntax shapes work is this:
+
+-] in syntax graph, a property node states a visualization ID
+-] that ID is looked up by the visualizer..  retrieves code that takes the graph element, crawls it looking for the visual properties it needs, then constructs the view set and view boxes and links those to the appropriate other view sets.
+- -] The code for that ID can do anything it wants as the way it generates the view-set.  For starters, for, say, Summation, will have a fixed SVG shape that the code knows, and will have fixed locations around it for the input and output ports, and will have a fixed size for each of those ports.
+- -] The input ports (and drawn output ports) each have their own bounding box.  Likewise, every view set has a total bounding box for the entire set.  The input port is part of the parent view set, so it has a translation and a scaling that is applied to the child view set.  The translation equals the position of the port (it is positioned relative to the same origin as the syntax shape).  The scale is calculated by taking the ration of the port width / contained-view-set-width  and the port-height / contain-view-set-height  and then choosing the smaller of the two.  When that is applied to the contained view set, then it will all fit within the port bounding box.
+- -] Can insert view sets that are not attached to any element.  For example, an entire sub-graph, conisting of, say, 8 elements is inserted as the body of a summation.  Make a view set as the parent of that entire sub-graph.  The view sets of the elements are placed relative to this graph-wide view-set's origin.
+
+Thusly, to make the visualizer code, only have to get an SVG string for the shape, doesn't matter what size it is!  It has a fixed size.  Then make the input port and drawn output port boxes of a size that looks reasonable compared to the shape.  And give them fixed positions relative to the shape's position.  There you go.  Done.  That now visualizes with appropriate sizes relative to all the rest, due to the thing where take ratio of bounding boxes as the scaling factor.
+
+
+//==============================================================
+//==
+//==   Code discovery system -- reuse!
+//==
+//==============================================================
+I'm sitting here writing all this front end stuff, and for sure someone else has written stuff very similar that I should be able to repurpose!  Yet web searches just don't catch it.  The current process for finding code out there that we can use doesn't work very well!  
+
+-] People throw up their code, but don't talk about the patterns within it..  they put a vew paragraphs about the outside, using it as a whole, but that's it..  and no words about the interfaces, nor the modules inside, nor the mechanics/plumbing..
+- -> A visual approach may help to quickly see the boundaries..  if the editor tool has a visual feature to highlight portions of code that are bound together due to names or shared variables, that will help to see boundaries quickly, so then can see the pieces..  then don't need words about the code, the picture shows quickly.  
+- -> However..  still need to search for these internal pieces!  Improve this by allowing other people to annotate and markup the code base..  the system of pulling other code in by reference, and then adding mods over the top should help here..  when pull in code, can add local annotations, and the system sees the pieces that have been extracted..  the system also sees the naming, so when do a search, can just talk about what looking for, and the names use in search may match to names used in variables and functions and comments..  both original and those added over the top of references.
+
+-] Going through someone else's code to figure out whether it will work for your purpose is painful.  Don't want to invest too much effort on something that will prove unusable.
+- -> address by making it faster to evaluate other's code..  visual approach, features that show the stickyness between bits of code (for example, if find one thing that does part of what want, can enable a tool that shows all the code that gets pulled along with it, due to names or variables -- getting away from names as wiring should help this, and the explicit scopes talk about below may help as well)
+
+-] boundaries within code are not clear..  what are the functional pieces?  The ways some people split their code up is beyond bizarre, and inverted ass backwards.  Discovering where the handles are that can grab and cleanly extract a piece takes a LOT of effort, have to learn large parts of the code.
+- -> visual code may help here..  people see the shape of what they produce.. and can visually detect boundaries, given effective visualization (maybe 3D)
+
+-] code is not cleanly separable.  Can't just grab a piece -- there are global vars and contextual vars that go with it, and it becomes like sticky spaghetti, grab just one strand, and it clings to another, then another, then whole big chunks have to be pulled out together!
+- -> need language to encourage contained pieces that fit together..  explicit scope containers might help here..  no global variables!  Still are shared vars, but the code shows clearly variables that are shared, and shows what things get those variables.
+- -> This will help make viable a tool that visualizes all the strands that have to be pulled in together
+- -> Also, the type-driven execution (inversion of control stuff) sounds like it will help as well.  Although, this is a layer above basic POP, done via syntax extensions.  
+
+= =] The challenge is to make POP gracefully support a variety of execution models -- just said a type driven model, want to allow ordering choices on the data.  Type driven has no ordering of datums relative to each other, any type that matches gets gobbled into any transform that accepts.  Want other orderings such as in-order (dataflow), or guard based (codetime), or something like annotations that state allowed pairings of datums (IE, door fits in particular frame, or a type of frame, separate the two, do things to them separately, then annotation says how to pair a particular door that has finished to a frame that is also finished).   Or even annotations that state order of functions (imperative style) or order of data flowing through transforms (stream based) or order of applying transforms to data (the data doesn't have to stay in order relative to other data, just the transforms have to be applied in a particular ancestry-of-data.. IE, track history of data, each transform is an edge, each node is a result of a particular path through transforms, has a particular pattern ((type)) for data.. so state something about allowed ancestry graph shapes).  Even control as data (compute some data which then acts as control for ordering of other computations.. is in INRIA notes somewhere, 2008 or so)
+- -> Note that some of the execution models will support discovery and reuse better than others!  Allow the menagerie, but build the reuse system in whatever way works best for reuse!  It will inevitably end up biasing towards particular execution models, which will encourage code that gets written in that model, and encourage extensions on top of that(those) particular execution model(s).
+
+= =] so, what is implied in basic POP approach, for supporting, say, imperative style, where the programmer explicitly states the scheduling of transforms on datums (IE, the application code tracks datums and commands particular transforms on particular datums)
+
+
+- -> Seeing licensing being built in to system, as giving permission to view and reference..  anything with an open source license is automatically made available to the search system, which indexes across all POP instances, and caches so that if the original source instance goes down then the cached code is still available.  Code is identified by name, not by location within a particular instance.  The caching is peer to peer, so there is no central anything..  the indexes migrate around and update as circumstances permit.  May have name server infrastructure, so have fixed "locations" that a new POP instance will connect to, in order to tie into the POP system.  Those are the "bootstrap" servers, that act as entry points. 
+
+
+========================================================================
+=
+=
+=
+========================================================================
+Thinking about interfacing the javascript parts with the POP executable..
+
+There's a Display piece and visualizer piece
+
+There are Holders, which have visualizers..  and then there are processors, which may want to vizualize something..  and then there are name-spaces..  which are chosen to be defined as part of a processor.. 
+
+So there's the case when have a running program..  which is a collection of live processors..
+
+And have case when have a worksheet..  which is a visualization of a collection of live processors plus views generated by Holders..
+
+And have case when seeing worm-holes out to other name-spaces (POP processor instances)..
+
+And have case when viewing and browsing and searching..  will have other POP instances to interact with, they present visualizations that come through the worm-hole onto your Display.
+
+Sooooo..  javascript is the Display implementation right now..  and it is the srcHolder, its Visualizer, Commander, and Modifier..  but the executable will be a C data-structure (graph) that builds itself out and a C based runtime that crawls the graph, generating inputs and firing off operations.
+
+So, what's the interface between the C exe-graph and the javascript Display, and how do those relate to the CTOS persistent processors, the interconnection/enclosure of those processors, and the Visualization of the processors and their interconnection?  How does a Display relate to a worksheet and how does a worksheet relate to the mix of srcHolders and live processors underneath it that are visualized upon the worksheet surface?
+
+-] So, I'm seeing for a worksheet that it Covers the entire Display, with perhaps a couple icons that can be expanded up in the corners..  So, can bring up views of available worksheets, and can bring up Service processors, such as for finding other POP instances that have relevant stuff to your interest, and so on..
+
+-] I would say that POP instances advertise..  any that offer a worm-hole advertise what it will connected you to..  the equivalent of Google becomes a peer-to-peer system built in to the fabric..  when you do a search for things of interest, it is these advertisements are part of that..  and seeing POP instances that act as discovery clearing houses, maybe..  not sure how that's all going to evolve best..  but some sort of system of POP instances making stuff available via advertised worm-holes that can be discovered..  every pop instance has a Discovery Service processor, which in turn has available some inter-POP instance mechanism for going out and finding these advertised worm-holes..  I guess the two work together..  and the inter-pop service is a virtual thing that runs in all the machines that are part of POP instances, as a peer-to-peer mechanism.
+
+-] In any case, have a worksheet -- that is a visualization of a collection of live processors and Holder visualizations..  so, thinking each live processor can have its own Visualizer..  
+- -] Holder processors have Visualizers that paint the data inside them and have a Commander that provides a means for interactively exploring that data via a Display.  srcHolders add a Modifier for interactive editing of the data inside the Holder.
+- -] other kinds of processors may also have their own Visualizer, which may connect to a Display.  Or, they may connect to their enclosing processor's Visualizer, or even the Visualizer of a worm-hole connected processor.
+- -] There is a CTOS/POP standard for one processor to discover the existence of another processor, and then to request connection to its visualizer.
+- -] There is also a CTOS/POP standard for discovering what kind of processor and asking about the Visualizer present within it.
+- -] It is up to the individual processors to ensure that the requesting visualizer knows how to set datums that the receiving understands.  There is no standard for what a Visualizer has inside of it, neither commands (other than detection commands and the connect command and the accept command) 
+
+In the case of games..  need very high speed access to the painting hardware..  so that comes in the form of a Display..  so thinking might have different kinds of Display Interface Language..  for example, make Direct X displays, and OpenGL displays, where the Visualizer talks to the Display directly via DirectX or OpenGL calls.  And then provide a wrapper around such Displays, so have the ViewGraph interface are defining right now for the srcHolder to make the MVDM loop.
+
+(BTW, thinking about quality of stuff writing here, and envisioning big projects that may have been designed and were beautiful in many ways but died because they had too high a barrier between where are at the time of inception versus that end point..  obviously all this POP stuff and the physics-as-only-fields stuff with the computation model stuff are prime candidates for such a thing!  Seeing in inner eye a wasteland of half-finished art works, ambitious and beautiful, lying rusting and rotting away..  the end-goal was fantastic and the structure was worked out to arrive there, but the journey required too much change from adoptors, and too much effort to get to something usable..  chances are clearly high that this will all end up like that, the thought occurs to me..  Euoaaaa..  NO! Dammit.  Mmmmm, working for my pleasure, not really any particular end-point outcome in the world.  Just enjoying working out these ideas and giving them some form of life in code, as exercise while learning skills I can trade for money (javascript, Python, Raphael, requirejs, jquery, mongodb.. need to work in mongodb!) )
+
+(BTW, what about writing the compiler in Python, called from the Bottle server, can start it now, as learning vehicle for Python..  and when have persistent processors, what about saving them into mongodb..  or better, saving all the source into mongo, to make it searchable..  start the discovery service that way..  add meta data about each source graph, just talking about it, and break that down via text mining, and turn it into an index for matching requests for code..  eventually add a recommendation system to track people's characteristics and match them with relevant code from others.   In fact, can add mongo now, finishing up that pymongo thing, and put in the )
+
+=====================================
+basically, the only thing inside javascript is the source graph and the srcHolder.  So the rest of the processors can be written..  what?  Inside C?  Have the Display interface.. hmmm..  what about making a javascript escape, and sending JSON through it..  could be sending to local host back and forth like I do with persisting the source graph.
