@@ -47,16 +47,38 @@ Hence, visual shapes can be stated in terms of their natural sizes,
  within its parent container, and then applying the parent's
  accumulated scaling, to get it to the right size on the screen.
  */
-function POPContainer() {
+function POPContainerFromLink( childViewSet, link, parentContainer) {
 	//note, this doesn't need to be a class, as is, but expect
 	// will add container-specific functions at some point
 	// (as of sept 14)
-    this.width  = 0;
-	this.height = 0;
-	this.realX  = 0;
-	this.realY  = 0;
-	this.imposedScaleFactor = 1.0;
-	this.children = [];
+	var childScaling = parentContainer.imposedScaleFactor *
+					   link.scaleFactor;
+	this.width	= childViewSet.width * childScaling;
+	this.height = childViewSet.height * childScaling;
+	this.realX	= parentContainer.realX +
+				  link.xOffset * parentContainer.imposedScaleFactor;
+	this.realY	= parentContainer.realY +
+				  link.yOffset * parentContainer.imposedScaleFactor;
+	this.imposedScaleFactor = childScaling;
+
+	this.children = []; //as of sept 2014, no longer used.. should delete!
+}
+
+function POPContainerFromBox( viewBox, parentContainer) {
+	//note, this doesn't need to be a class, as is, but expect
+	// will add container-specific functions at some point
+	// (as of sept 14)
+	var boxScaleFactor = parentContainer.imposedScaleFactor *
+					   viewBox.scaleFactor;
+	this.width	= viewBox.width * boxScaleFactor;
+	this.height = viewBox.height * boxScaleFactor;
+	this.realX	= parentContainer.realX +
+				  viewBox.xOffset * parentContainer.imposedScaleFactor;
+	this.realY	= parentContainer.realY +
+				  viewBox.yOffset * parentContainer.imposedScaleFactor;
+	this.imposedScaleFactor = boxScaleFactor;
+
+	this.children = []; //as of sept 2014, no longer used.. should delete!
 }
 
 //POPContainer.__proto__ = ?;
@@ -129,7 +151,7 @@ __POPSVGRoot = document.getElementById("svgRoot");
 //=
 //=====================================================================
 /*
-RenderWindow is the external call made on the Display that causes
+renderView is the external call made on the Display that causes
  the Display to render the sub-graphs visible from the browser window,
  given the current zoom and pan settings.
 	
@@ -139,7 +161,7 @@ NOTE: as of sept 10, 2014, this works by building a hierarchy of containers
  is implied by passing them together as parameters.  Hence, the hierarchy
  is transient and recomputed every time the window is rendered!
  */
-var renderWindow = function( window ){
+var renderView = function( rootView ){
 
 	//for now (sept 2014), have only one sub-graph.
 	//Each root view set has to be scaled and shifted to its position
@@ -147,7 +169,8 @@ var renderWindow = function( window ){
 	//Note: this plumbing may change.. don't really want the visualizer
 	// to have to calculate the position and scaling of each root view set
 	//Render the root view set -- position and scale are inside transforms
-	var child = window.children[0];
+	var linkToRootViewSet = rootView.children[0];
+	
 	renderRootViewSet( child.rootViewSet, child.transforms );
 		//now done with 
 	child.rootViewSet.advanceTagsToNextRound();//marks all boxes as unvisited
@@ -210,7 +233,7 @@ Start recursion..  this fn processes one view-set
  Mark the current (passed in as parameter) view set as "visited this round"
  Make a container, and add this container to the end of the parent chain
 */
-function renderRootViewSet (rootViewSet, transforms) {
+function renderRootViewSet (link) {
 	//For Root View Set do this: 
 	//-] Make a container for it, which acts as a root container.
 	//- -] The container width and height scaled according to transforms
@@ -218,15 +241,12 @@ function renderRootViewSet (rootViewSet, transforms) {
 	//-] Call the function that renders the view tree of a view set.
 	//-] Call the recursive function that walks the view-set graph, visiting 
 	//   the connected view-sets.
-	var rootContainer = new POPContainer();
-	rootContainer.width = 
-			rootViewSet.boundingBoxWidth * transforms.scaleFactor;
-	rootContainer.height = 
-			rootViewSet.boundingBoxHeight * transforms.scaleFactor;
-	rootContainer.realX = transforms.realX;
-	rootContainer.realY = transforms.realY;
-	rootContainer.imposedScaleFactor = transforms.scaleFactor;
-
+	var rootViewSet = link.childViewSet;
+	var rootContainer = new POPContainer( rootViewSet, link, 
+		{ imposedScaleFactor: 1.0,
+			realX: 0,
+			realY: 0
+		});
 	rootViewSet.container = rootContainer;
 	
     //render the set's tree of view boxes within the set's container
@@ -258,7 +278,7 @@ function renderRootViewSet (rootViewSet, transforms) {
 - -] It will take the realX and realY out of the parent container, add the
      link's xOffset and yOffset, scaled by the parent container's imposed
 	 scaling, to get the realX and realY of the child view set's container.
-- -] It will take the imposedScaling out of the root container, multiply
+- -] It will take the imposedScaleFactor out of the root container, multiply
      by the linkScaling in the link, and make that the imposed scaling of
      the child view set's container.
 - -] It will then render the view tree of the child view set 
@@ -293,17 +313,8 @@ function visitLinkedViewSets( viewSet ) {
 						
             // This is an unvisited child of current, so make its container
 			var childViewSet = currLink.childViewSet;
-			var childContainer = new POPContainer();
-			var childScaling = viewSet.container.imposedScaling *
-					             currLink.scaleFactor;
-			childContainer.width = childViewSet.width * childScaling;
-			childContainer.height = childViewSet.height * childScaling;
-			childContainer.realX = viewSet.container.realX +
-					currLink.xOffset * viewSet.container.imposedScaling;
-			childContainer.realY = viewSet.container.realY +
-					currLink.yOffset * viewSet.container.imposedScaling;
-			childContainer.imposedScaleFactor = childScaling;
-
+			var childContainer = new POPContainer( childViewSet, currLink, 
+												   viewSet.container );
 			childViewSet.container = childContainer;
 			
             //render the set's tree of view boxes within the set's container
@@ -401,20 +412,8 @@ function renderTheViewTreeOfViewSet( viewSet ) {
 		// together, and have same origin
 		if(viewBoxToProcess.children.length !== 0) {
 			//make container for the view box
-			var boxContainer = new POPContainer();
-			var totalScaleFactor = parentContainer.imposedScaleFactor *
-								   viewBoxToProcess.scaleFactor;
-			boxContainer.width = viewBoxToProcess.width * totalScaleFactor;
-			boxContainer.height = viewBoxToProcess.height * totalScaleFactor;
-			boxContainer.realX = parentContainer.realX + 
-					viewBoxToProcess.xOffset * 
-					parentContainer.imposedScaleFactor;
-			boxContainer.realY = parentContainer.realY + 
-					viewBoxToProcess.yOffset * 
-					parentContainer.imposedScaleFactor;
-			boxContainer.imposedScaleFactor = 
-					parentContainer.imposedScaleFactor *
-					viewBoxToProcess.scaleFactor;
+			var boxContainer = 
+				new POPContainerFromBox( viewBoxToProcess, parentContainer);
 
 			viewBoxToProcess.container = boxContainer;
 			
@@ -572,7 +571,7 @@ function connectToCommander( commanderIn ) {
 return{
 	init:				init,
 	connectToCommander:	connectToCommander,
-	renderWindow:		renderWindow
+	renderView:		renderView
 };
 });
 

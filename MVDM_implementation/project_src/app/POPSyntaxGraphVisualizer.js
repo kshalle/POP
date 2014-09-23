@@ -3,10 +3,7 @@
 //Make a Visualizer object, and a number of functions that operate on it.
 // One of the functions accepts 
 define(function(require, exports, module) {
-var srcHolder = {};
-var DisplayToSendTo = {};
-
-var rootViewSet = {};
+var srcHolder; var DisplayToSendTo; var rootView;
 
 //var renderer = require('./renderPOPSyntaxGraph');
 
@@ -17,6 +14,10 @@ function init() {
 }
 
 /*
+set src holder is called by the source holder at the point that a user
+ indicates that they want a view.  The source holder creates a view object
+ for that user, and creates a visualizer object for that window, and then
+ calls this to pass the view object to the newly created visualizer.
 The way visualization works is that the Display has a particular window
  that it renders into, but the visualizer is kept isolated from the details.
  Rather, the visualizer keeps a visualization inside a carrier, which it
@@ -30,12 +31,42 @@ The window has particular dimensions, and a visualization needs to know
  view set, and the link to it contains the offset relative to the Display's
  window's origin, and it contains a scaling to apply to the link's child
  view set.
- k
-  
+
+The source holder keeps an object for each window that is open into the
+ source holder's contents.
+(Note that eventually a srcHolder will be a revisioned processor/timeline,
+ which means that multiple copies of it will exist, each with variations in
+ their evolution.  The POP system will handle sending updates between copies,
+ sandboxing the copies, and giving viewers the ability to control updates
+ from other copies and merges.  For example, viewers who tunnel in to a 
+ given POP processor instance will do so via an authentication object, 
+ which carries information on how to handle remote views.  According to 
+ that, the srcHolder contents being view will likely be copied over, and
+ separate editing can then take place remotely, with the copy having its
+ own version of the timeline.  The authentication gives the policy on
+ sending updates back to the home copy, vs making it a distributed holder,
+ and policy on sandboxing ((so no updates go out or in)), and so on..)
+So, remote views of a src holder have the window object inside the remote
+ copy, and it likely isn't visible outside the remote POP instance (or
+ if the POP instance is over distributed hardware, then the holder may be
+ replicated or even divided among the hardware, so a given window may only
+ be visible on one of the hardware boxes)
+
+For now, there is a window object for each window that is open and viewing
+ the srcHolder contents.
+The srcHolder creates a separate visualizer object for each such window.
+ That allows the visualizer to have state about the window, such as where
+ the camera is located in space, the zoom factor, where the insertion point
+ is within the graph for that user (who can have multiple windows, all
+ seeing the same insertion point and same selection)
+	
+As of Sept 2014, this function is called by an artificial test setup that
+ connects all the pieces: visualizer, src holder, display, commander,
+ modifier..
  */
-function setSrcHolder( srcHolderIn ) {
+function setSrcHolder( srcHolderIn, _rootView ) {
 	srcHolder = srcHolderIn;
-	rootViewSet = srcHolder.syntaxGraph.rootViewSet;
+	rootView = _rootView;
 }
 
 function connectToDisplay( POPDisplay ) {
@@ -72,23 +103,8 @@ function visualizeNewSubGraph( newSubGraphRootElem ) {
     rootViewSet = newSubGraphRootElem.viewSet;
 
     console.log("Visualizer -- new root view set ID: " + rootViewSet.ID );
-	
-	//for now, just send reference to the viewHierarchy -- make this 
-	// sane later (not sure whether will do a "class" and create 
-	// instance via new operator, or what..)
-	var rootTransforms = {
-		realX: 0, //the root view set will have it's origin at 0,0 of window
-		realY: 0,
-		width: 800,
-		height: 600,
-		scaleFactor: 1.0
-	};
-	var rootWindow = {};
-	rootWindow.children = [];
-	rootWindow.children.push( {	rootViewSet: rootViewSet, 
-								transforms:  rootTransforms } );
-	
-	DisplayToSendTo.renderWindow( rootWindow );
+		
+	DisplayToSendTo.renderView( rootView );
 	
 	return;
 }
