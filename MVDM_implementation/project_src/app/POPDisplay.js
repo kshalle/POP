@@ -174,7 +174,7 @@ var renderView = function( rootView ){
 	renderRootViewSet( child.rootViewSet, child.transforms );
 		//now done with 
 	child.rootViewSet.advanceTagsToNextRound();//marks all boxes as unvisited
-}
+};
 
 
 /*

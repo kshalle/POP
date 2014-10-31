@@ -1,26 +1,64 @@
 
+
+__POPSVGRoot = document.getElementById("svgRoot"); 
+
+var SVG_NS="http://www.w3.org/2000/svg";
+function SVGElem( shapeStr, shapeX, shapeY, scale, viewBox ) {
+   var SVGObj= document.createElementNS(SVG_NS,"svg");
+   SVGObj.innerHTML = shapeStr;
+   SVGObj.x.baseVal.value=shapeX;
+   SVGObj.y.baseVal.value=shapeY;
+   SVGObj.setAttribute('transform', "scale(" + scale + ")" );
+   //can also give both x and y scale factors, as in: "scale(2,2)";
+   
+   //add a way for generic POP event handler to go backwards to the 
+   // view box.  It gets the SVG obj in the event, uses this backlink.
+   SVGObj.correspondingViewBox = viewBox;
+
+   //Add the generic POP event handlers to the svg element
+   // SVGObj.onclick=svgClick;
+   // SVGObj.onmouseenter=svgMouseEnter;
+   // SVGObj.onmouseout=svgMouseOut;
+   __POPSVGRoot.appendChild( SVGObj );
+   return SVGObj;
+}
+								
 	//Do this part once, of creating a DOM element and adding it to document
 	var el1 =  document.createElement("div");
 	document.body.appendChild(el1); //only need to append once then reuse
 	
+	var text1_1_1 = {};
+	text1_1_1.content = "text1_1_1";
+	
 	//now set the SVG text string -- from this point down can be repeated 
 	// for multiple strings without removing or re-adding the element, nor
 	// fiddling with the DOM
-	var text1_1_1_SVG = '<svg>  <text x="0" y="0" style="font-family: Arial; font-size: 12;fill:none;stroke:none" id="svgText1">' + text1_1_1.content + '</text> </svg>';
-	//note the id is inside the text element! Also the fill and stroke are
-	// null so nothing paints
-	el1.innerHTML = text1_1_1_SVG; 
+	var text1_1_1_SVG = '<text x="0" y="10" style="font-family: Arial; font-size: 12;fill:none;stroke:blue" id="svgText1">' + text1_1_1.content + '</text>';
 
-	//get the element -- this seems to be what triggers the bounding box calc
-	var test = document.getElementById("svgText1"); //use ID of the text elem
-
-	//get the box, take the values out of it, and display them
-    var rect = test.getBoundingClientRect();
+	var newSVGElem = new SVGElem(	text1_1_1_SVG, 0, 0, 1.0, null );
+								
+	var rect = newSVGElem.getBoundingClientRect();
 	var str = "";
 	for (i in rect) { //a trick for getting all the attributes of the object
 		str += i + " = " + rect[i] + "  ";
 	}
 	console.log("svgText1: " + str);
+
+	//note the id is inside the text element! Also the fill and stroke are
+	// null so nothing paints
+//	el1.innerHTML = text1_1_1_SVG; 
+
+	//get the element -- this seems to be what triggers the bounding box calc
+//	var test = document.getElementById("svgText1"); //use ID of the text elem
+
+	//get the box, take the values out of it, and display them
+	
+    // var rect = test.getBoundingClientRect();
+	// var str = "";
+	// for (i in rect) { //a trick for getting all the attributes of the object
+		// str += i + " = " + rect[i] + "  ";
+	// }
+	// console.log("svgText1: " + str);
 		
 	var el2 =  document.createElement("span");
 	el2.style.display="block";
@@ -68,6 +106,9 @@
       }
 	});
 //	document.body.removeChild(el1);
+	var text1_1_2 = {};
+	text1_1_2.content = "text1_1_2";
+
 	var text1_1_2_SVG = '<svg> <text id="svgText2" x="0" y="0" style="font-family: Arial; font-size: 12;fill:none;stroke:none">' + text1_1_2.content + '</text> </svg>';
 	el1.innerHTML = text1_1_2_SVG;
 //	document.body.appendChild(el1);
